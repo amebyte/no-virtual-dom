@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>通过虚拟DOM操作DOM</title>
+  </head>
+  <body>
+    <script>
+        function createElement(type, props) {
+            return {
+                type,
+                props
+            }
+        }
+        let count = 1
+        function App (){
+            return createElement('button', {
+                onClick: () => {
+                    count ++
+                    setCount(count)
+                },
+                children: count
+            })
+        }
+
+        let oldVnode
+        function render(vNode, container) {
+            if (!oldVnode) {
+                oldVnode = vNode
+                const el = document.createElement(vNode.type)
+                // 保存真实DOM 到虚拟DOM 的 el 属性上，将来更新的时候，不用重新创建，从而达到提高性能效果
+                oldVnode.el = el
+                const textNode =  document.createTextNode(vNode.props.children)
+                el.appendChild(textNode)
+                // 绑定虚拟DOM 上的事件
+                el.addEventListener('click', vNode.props.onClick)
+                container.appendChild(el)
+            } else if(oldVnode.props.children !== vNode.props.children) {
+                oldVnode.el.textContent = vNode.props.children
+            }
+        }
+
+        function setCount(val) {
+            count = val
+            render(App(), document.getElementById('app'))
+        }
+
+        render(App(), document.getElementById('app'))
+    </script>
+  <body>
+</html>
