@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>手动操作DOM</title>
+  </head>
+  <body>
+    <button id="btn"></button>
+    <script>
+        let count = 1
+        const btnEl = document.getElementById('btn')
+        btnEl.textContent = count
+        btnEl.addEventListener('click', function () {
+            count++
+            btnEl.textContent = count
+        })
+    </script>
+  <body>
+</html>
