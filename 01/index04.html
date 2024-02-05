@@ -12,7 +12,6 @@
                 props
             }
         }
-        let count = 1
         const data = { count: 1 }
         // 声明一个订阅者中心
         const subscriber = new Set()
@@ -39,10 +38,9 @@
         function App (){
             return createElement('button', {
                 onClick: () => {
-                    count ++
-                    setCount(count)
+                    data.count ++
                 },
-                children: count
+                children: data.count
             })
         }
 
