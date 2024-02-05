@@ -5,6 +5,7 @@
     <title>通过虚拟DOM操作DOM</title>
   </head>
   <body>
+    <div id="app"></div>
     <script>
         function createElement(type, props) {
             return {
@@ -61,12 +62,13 @@
             }
         }
 
-        function setCount(val) {
-            count = val
+        activeEffect = () => {
             render(App(), document.getElementById('app'))
         }
 
-        render(App(), document.getElementById('app'))
+        activeEffect()
+
+        activeEffect = null
     </script>
   <body>
 </html>
