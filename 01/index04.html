@@ -15,9 +15,10 @@
         let count = 1
         const data = { count: 1 }
         Object.keys(data).forEach(key => {
+            const val = data[key]
             Object.defineProperty(data, key, {
                 get() {
-                    return data[key]
+                    return val
                 },
                 set(val) {
                     data[key] = val
