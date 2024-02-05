@@ -15,16 +15,19 @@
         let count = 1
         const data = { count: 1 }
         Object.keys(data).forEach(key => {
-            const val = data[key]
+            defineReactive(data, key, data[key]) 
+        })
+
+        function defineReactive(data, key, val) {
             Object.defineProperty(data, key, {
                 get() {
                     return val
                 },
-                set(val) {
-                    data[key] = val
+                set(newVal) {
+                    val = newVal
                 }
-            }) 
-        })
+            })
+        }
         function App (){
             return createElement('button', {
                 onClick: () => {
