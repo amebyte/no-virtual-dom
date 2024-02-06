@@ -20,10 +20,10 @@
         function Observer (data) {
             // 给对象 data 添加一个属于 data 对象的订阅者中心
             Object.defineProperty(data, '__ob__', {
-                value: new Set(),
-                enumerable: false,
-                writable: true,
-                configurable: true
+                value: new Set(), // 属性的值，默认为 undefined
+                enumerable: false, // 属性是否可枚举，默认为 false
+                writable: true, // 值是否可写，默认为 false
+                configurable: true // 属性是否可配置，默认为 false
             })
             Object.keys(data).forEach(key => {
                 const value = data[key]
