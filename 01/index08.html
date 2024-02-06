@@ -21,9 +21,9 @@
             return {
                 _value: value,
                 get value() {
-                // 存在依赖就把依赖收集到订阅者中心
-                activeEffect && subscriber.add(activeEffect)
-                return this._value
+                    // 存在依赖就把依赖收集到订阅者中心
+                    activeEffect && subscriber.add(activeEffect)
+                    return this._value
                 },
                 set value(val) {
                     this._value = val
