@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>通过响应式数据生成虚拟DOM操作DOM</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+        function createElement(type, props) {
+            return {
+                type,
+                props
+            }
+        }
+        // 声明一个订阅者中心
+        const subscriber = new Set()
+        // 需要收集的依赖，在 Vue2 叫 wachter，Vue3 中叫 effect，本质上就是一个更新函数
+        let activeEffect
+        function Observer (data) {
+            // 给对象 data 添加一个属于 data 对象的订阅者中心
+            data.__ob__ = new Set()
+            Object.keys(data).forEach(key => {
+                const value = data[key]
+                defineReactive(data, key, value) 
+            })
+        }
+
+        function defineReactive(data, key, val) {
+            Object.defineProperty(data, key, {
+                get() {
+                    // 存在依赖就把依赖收集到订阅者中心
+                    if(activeEffect) {
+                        subscriber.add(activeEffect)
+                        // 如果读取的值是对象，那么还要给这个对象进行依赖收集，并且新的对象也要通过 Observer 进行监听
+                        if(Object.prototype.toString.call(val) === '[object Object]') {
+                            Observer(val)
+                            val.__ob__.add(activeEffect)
+                        }
+                    } 
+                    return val
+                },
+                set(newVal) {
+                    val = newVal
+                    // 值更新了，就需要去把订阅者中心中的订阅者全部重新执行一遍
+                    subscriber.forEach(sub => sub())
+                }
+            })
+        }
+
+        function set(target, key, val) {
+            target[key] = val
+            // 新添加的属性也需要通过 Object.defineProperty 进行监听
+            defineReactive(target, key, val)
+            const ob = target.__ob__
+            // 进行对象的依赖触发
+            ob.forEach(sub => sub())
+        }
+
+        // 修改数据结构
+        const data = { data: { count: 1 } }
+        // 通过 Observer 处理
+        Observer(data)
+        
+        function App (){
+            return createElement('button', {
+                onClick: () => {
+                    set(data.data, 'count2', 2)
+                },
+                children: JSON.stringify(data.data)
+            })
+        }
+
+        let oldVnode
+        function render(vNode, container) {
+            if (!oldVnode) {
+                oldVnode = vNode
+                const el = document.createElement(vNode.type)
+                // 保存真实DOM 到虚拟DOM 的 el 属性上，将来更新的时候，不用重新创建，从而达到提高性能效果
+                oldVnode.el = el
+                const textNode =  document.createTextNode(vNode.props.children)
+                el.appendChild(textNode)
+                // 绑定虚拟DOM 上的事件
+                el.addEventListener('click', vNode.props.onClick)
+                container.appendChild(el)
+            } else if(oldVnode.props.children !== vNode.props.children) {
+                oldVnode.el.textContent = vNode.props.children
+            }
+        }
+
+        activeEffect = () => {
+            render(App(), document.getElementById('app'))
+        }
+
+        activeEffect()
+
+        activeEffect = null
+    </script>
+  <body>
+</html>
