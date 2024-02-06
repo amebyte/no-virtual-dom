@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>通过响应式数据生成虚拟DOM操作DOM</title>
+    <title>对象响应式</title>
   </head>
   <body>
     <div id="app"></div>
@@ -19,7 +19,12 @@
         let activeEffect
         function Observer (data) {
             // 给对象 data 添加一个属于 data 对象的订阅者中心
-            data.__ob__ = new Set()
+            Object.defineProperty(data, '__ob__', {
+                value: new Set(),
+                enumerable: false,
+                writable: true,
+                configurable: true
+            })
             Object.keys(data).forEach(key => {
                 const value = data[key]
                 defineReactive(data, key, value) 
