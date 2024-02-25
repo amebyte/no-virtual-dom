@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>事件总线简单实现</title>
+  </head>
+  <body>
+    <script>
+        // 定义事件总线
+        class EventBus {
+            constructor() {
+                // 订阅者的记录列表
+                this._events = {}
+            }
+            // 添加订阅者
+            on(event, fn) {
+                // 如果还没有订阅过此类消息，则给该类消息创建一个记录列表
+                if(!this._events[event]){
+                    this._events[event] = []
+                }
+                // 把订阅者添加进记录列表
+                this._events[event].push(fn)
+            }
+            // 发布信息
+            emit(event) {
+                let cbs = this._events[event]
+                // 发布信息时就是把记录列表中的订阅者全部通知一次
+                for (let i = 0; i < cbs.length; i++) {
+                    cbs[i](arguments)
+                }
+            }
+            // 取消订阅
+            off(event, fn) {
+                // 找到需要删除的订阅者
+                const index = this._events[event].indexOf(fn)
+                // 删除订阅者
+                this._events[event].splice(index, 1 )
+            }
+        }
+    </script>
+  <body>
+</html>
