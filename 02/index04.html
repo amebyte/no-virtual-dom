@@ -22,12 +22,9 @@
                 this._events[event].push(fn)
             }
             // 发布信息
-            emit(event) {
-                let cbs = this._events[event]
+            emit(event, title) {
                 // 发布信息时就是把记录列表中的订阅者全部通知一次
-                for (let i = 0; i < cbs.length; i++) {
-                    cbs[i](arguments)
-                }
+                this._events[event].forEach(sub => sub.update(title))
             }
             // 取消订阅
             off(event, fn) {
@@ -37,6 +34,44 @@
                 this._events[event].splice(index, 1 )
             }
         }
+        // 实例化事件总线
+        const evtBus = new EventBus()
+        // 招聘公司
+        class Company {
+            constructor() {
+                
+            }
+            // 发布招聘信息
+            publish(event, text) {
+                evtBus.emit(event, text)
+            }
+        }
+
+        // 求职者郭靖
+        class SubGuoJing {
+            constructor() {
+
+            }
+            // 订阅岗位信息
+            subscriber(event) {
+                evtBus.on(event, this)
+            }
+            // 接受企业招聘信息更新方法
+            update(title) {
+                console.log('郭靖收到的招聘信息：', title)
+            }
+        }
+
+        // 实例化招聘公司
+        const company = new Company()
+        // 实例化求职者
+        const subGuoJing = new SubGuoJing()
+
+        // 求职者郭靖订阅前端的招聘信息
+        subGuoJing.subscriber('frontEnd')
+        // 招聘公司发布前端的岗位信息
+        company.notify('frontEnd', '前端工程师')
+
     </script>
   <body>
 </html>
