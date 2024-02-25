@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>依赖追踪的基础 —— 发布订阅模式</title>
+  </head>
+  <body>
+    <script>
+        // 定义一家公司
+        class Company {
+            constructor() {
+                // 订阅招聘信息的人的记录列表
+                this.subscribers = []
+            }
+            // 添加订阅者
+            addDep(fn) {
+                // 把订阅者添加进记录列表
+                this.subscribers.push(fn)
+            }
+            // 发布信息
+            notify(title) {
+                // 发布信息时就是把记录列表中的订阅者全部通知一次
+                this.subscribers.forEach(sub => sub.update(title));
+            }
+            // 取消订阅
+            remove(fn) {
+                // 找到需要删除的订阅者
+                const index = this.subscribers.indexOf(fn)
+                // 删除订阅者
+                this.subscribers.splice(index, 1 )
+            }
+        }
+
+        // 求职者郭靖
+        class SubGuoJing {
+            constructor() {
+
+            }
+            // 接受企业招聘信息更新方法
+            update(title) {
+                console.log('郭靖收到的招聘信息：', title)
+            }
+        }
+
+        // 求职者杨过
+        class SubYangGuo {
+            constructor() {
+
+            }
+            // 接受企业招聘信息更新方法
+            update(title) {
+                console.log('杨过收到的招聘信息：', title)
+            }
+        }
+
+        // 实例化公司
+        const company = new Company()
+        // 实例化订阅者郭靖
+        const subGuoJing = new SubGuoJing()
+
+        // 实例化订阅者杨过
+        const subYangGuo = new SubYangGuo()
+
+        // 公司记录郭靖的信息
+        company.addDep(subGuoJing)
+        // 公司记录杨过的信息
+        company.addDep(subYangGuo)
+        // 公司发布招聘信息，郭靖杨过都将收到招聘信息
+        company.notify('前端工程师')
+        // 公司发布招聘信息，郭靖杨过都将收到招聘信息
+        company.notify('后端工程师')
+        // 郭靖信息作假，公司删除郭靖信息
+        company.remove(subGuoJing)
+        // 公司再次发布招聘信息，郭靖不再收到招聘信息
+        company.notify('运维工程师')
+    </script>
+  <body>
+</html>
