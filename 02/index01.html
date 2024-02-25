@@ -9,22 +9,22 @@
         // 定义公众号
         const weChatOfficialAccount = {}
         // 订阅公众号的人的记录列表
-        weChatOfficialAccount.subscriber = []
+        weChatOfficialAccount.subscribers = []
         // 添加订阅者
         weChatOfficialAccount.addDep = function(fn) {
             // 把订阅者添加进记录列表
-            this.subscriber.push(fn) 
+            this.subscribers.push(fn) 
         }
         // 发布信息
         weChatOfficialAccount.notify = function(title) {
             // 发布信息时就是把记录列表中的订阅者全部通知一次
-            this.subscriber.forEach(fn => fn(title));
+            this.subscribers.forEach(fn => fn(title));
         }
         // 取消订阅
         weChatOfficialAccount.remove = function(fn) { 
-            const index = this.subscriber.indexOf(fn)
+            const index = this.subscribers.indexOf(fn)
             // 删除订阅者
-            this.subscriber.splice(index, 1 )
+            this.subscribers.splice(index, 1 )
         }
 
         // 订阅者小明
