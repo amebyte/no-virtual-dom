@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>依赖追踪的基础 —— 发布订阅模式</title>
+  </head>
+  <body>
+    <script>
+// 定义公众号
+const weChatOfficialAccount = {
+    // 订阅公众号的人的记录列表
+    subscribers: [],
+    // 文章内容
+    article: '',
+    // 发布文章
+    setArticle(value) {
+        this.article = value
+        // 更新文章的时候通知所有的订阅者
+        this.notify()
+    },
+    // 添加订阅者
+    addDep(fn) {
+        // 把订阅者添加进记录列表
+        this.subscribers.push(fn) 
+    },
+    // 广播信息
+    notify(title) {
+        // 发布信息时就是把记录列表中的订阅者全部通知一次
+        this.subscribers.forEach(obj => obj.update(this.article))
+    },
+    // 取消订阅
+    remove(fn) { 
+        // 找到需要删除的订阅者
+        const index = this.subscribers.indexOf(fn)
+        // 删除订阅者
+        this.subscribers.splice(index, 1 )
+    }
+}
+
+// 订阅者小明
+const subscriber = {
+    // 关注公众号
+    follow() {
+       weChatOfficialAccount.addDep(subscriber) 
+    },
+    // 取消关注
+    unfollow() {
+       weChatOfficialAccount.remove(subscriber) 
+    },
+    // 接受公众号推送信息
+    update(title) {
+        console.log('收到的公众号文章：', title)
+    }
+}
+
+// 小明订阅公众号
+subscriber.follow()
+weChatOfficialAccount.setArticle('什么是发布订阅模式？')
+    </script>
+  <body>
+</html>
