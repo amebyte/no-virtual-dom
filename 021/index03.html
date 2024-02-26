@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>依赖追踪的基础 —— 发布订阅模式</title>
+  </head>
+  <body>
+    <script>
+// 定义一家公司
+class CompanyObservable {
+    constructor() {
+        this.driver = ''
+        // 订阅招聘信息的人的记录列表
+        this.subscribers = []
+    }
+    setDriver(value) {
+        this.driver = value
+        this.notify()
+    }
+
+    // 添加订阅者
+    addDep(fn) {
+        // 把订阅者添加进记录列表
+        this.subscribers.push(fn)
+    }
+    // 发布信息
+    notify() {
+        // 发布信息时就是把记录列表中的订阅者全部通知一次
+        this.subscribers.forEach(sub => sub.update(this.driver));
+    }
+    // 取消订阅
+    remove(fn) {
+        // 找到需要删除的订阅者
+        const index = this.subscribers.indexOf(fn)
+        // 删除订阅者
+        this.subscribers.splice(index, 1 )
+    }
+}
+
+const company = new CompanyObservable()
+
+class Subscriber {
+    constructor(name) {
+        this._name = name
+    }
+
+    // 关注
+    follow() {
+        company.addDep(this) 
+    }
+
+    // 取消关注
+    unfollow() {
+        company.remove(this) 
+    }
+
+    // 接受企业司机信息更新方法
+    update(title) {
+        console.log(`${this._name}收到的司机信息：${title}`)
+    }
+}
+
+const guojing = new Subscriber('郭靖')
+
+// 郭靖关注
+guojing.follow()
+
+// 公司发布司机
+company.setDriver('深圳-东莞的司机')
+
+const yangguo = new Subscriber('杨过')
+const ouyangfeng = new Subscriber('欧阳锋')
+yangguo.follow()
+ouyangfeng.follow()
+company.setDriver('广州-东莞的司机')
+    </script>
+  <body>
+</html>
