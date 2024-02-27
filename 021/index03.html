@@ -6,73 +6,83 @@
   </head>
   <body>
     <script>
-// 定义一家公司
+// 定义发布者招聘公司
 class CompanyObservable {
     constructor() {
-        this.driver = ''
+        // 岗位
+        this.post = ''
         // 订阅招聘信息的人的记录列表
         this.subscribers = []
     }
-    setDriver(value) {
-        this.driver = value
+    // 发布岗位
+    setPost(value) {
+        this.post = value
+        // 岗位更新了，通知所有的订阅者
         this.notify()
     }
-
     // 添加订阅者
-    addDep(fn) {
+    addDep(sub) {
         // 把订阅者添加进记录列表
-        this.subscribers.push(fn)
+        this.subscribers.push(sub)
     }
     // 发布信息
     notify() {
         // 发布信息时就是把记录列表中的订阅者全部通知一次
-        this.subscribers.forEach(sub => sub.update(this.driver));
+        this.subscribers.forEach(sub => sub.update(this.post));
     }
     // 取消订阅
-    remove(fn) {
+    remove(sub) {
         // 找到需要删除的订阅者
-        const index = this.subscribers.indexOf(fn)
+        const index = this.subscribers.indexOf(sub)
         // 删除订阅者
         this.subscribers.splice(index, 1 )
     }
 }
 
+// 实例化发布者招聘公司
 const company = new CompanyObservable()
 
 class Subscriber {
     constructor(name) {
+        // 求职者名称
         this._name = name
     }
-
-    // 关注
+    // 订阅
     follow() {
         company.addDep(this) 
     }
-
-    // 取消关注
+    // 取消订阅
     unfollow() {
         company.remove(this) 
     }
-
-    // 接受企业司机信息更新方法
-    update(title) {
-        console.log(`${this._name}收到的司机信息：${title}`)
+    // 接受招聘公司信息更新方法
+    update(content) {
+        console.log(`${this._name}收到的招聘信息：${content}`)
     }
 }
 
+// 创建订阅者郭靖
 const guojing = new Subscriber('郭靖')
-
-// 郭靖关注
+// 郭靖订阅招聘公司的岗位信息
 guojing.follow()
+// 发布者公司发布岗位
+company.setPost('前端工程师')
 
-// 公司发布司机
-company.setDriver('深圳-东莞的司机')
-
+// 创建订阅者杨过
 const yangguo = new Subscriber('杨过')
+// 创建订阅者欧阳锋
 const ouyangfeng = new Subscriber('欧阳锋')
+// 杨过订阅招聘公司的岗位信息
 yangguo.follow()
+// 欧阳锋订阅招聘公司的岗位信息
 ouyangfeng.follow()
-company.setDriver('广州-东莞的司机')
+// 发布者招聘公司发布岗位信息
+company.setPost('后端工程师')
+
+// 郭靖信息作假，公司删除郭靖信息
+company.remove(guojing)
+// 公司再次发布招聘信息，郭靖不再收到招聘信息
+company.setPost('运维工程师')
     </script>
   <body>
 </html>
