@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>依赖追踪的基础 —— 发布订阅模式</title>
+  </head>
+  <body>
+    <script>
+// 定义一家公司
+class CompanyObservable {
+    constructor() {
+        // 岗位信息
+        this.post = {
+            // 前端岗位信息
+            frontEnd: '',
+            // 后端的岗位信息
+            backEnd: '',
+            // 运维的岗位信息
+            DevOps: '' 
+        }
+        // 订阅招聘信息的人的记录列表
+        this.subscribers = {}
+    }
+    // 发布岗位
+    setPost(event, value) {
+        this.post[event] = value
+        // 岗位更新了，通知所有的订阅者
+        this.notify(event)
+    }
+    // 添加订阅者
+    addDep(event, sub) {
+        // 如果还没有订阅过此类消息，则给该类消息创建一个记录列表
+        if (!this.subscribers[event]) {
+            this.subscribers[event] = []
+        }
+        // 把订阅者添加进记录列表
+        this.subscribers[event].push(sub)
+    }
+    // 发布信息
+    notify(event) {
+        // 发布信息时就是把记录列表中的订阅者全部通知一次
+        this.subscribers[event].forEach(sub => sub.update(this.post[event]));
+    }
+    // 取消订阅
+    remove(event, sub) {
+        // 找到需要删除的订阅者
+        const index = this.subscribers[event].indexOf(sub)
+        // 删除订阅者
+        this.subscribers[event].splice(index, 1 )
+    }
+}
+
+// 实例化发布者招聘公司
+const company = new CompanyObservable()
+
+class Subscriber {
+    constructor(name) {
+        // 求职者名称
+        this._name = name
+    }
+    // 订阅，添加订阅事件类型参数
+    follow(event) {
+        company.addDep(event, this) 
+    }
+    // 取消订阅
+    unfollow(event) {
+        company.remove(event, this) 
+    }
+    // 接受招聘公司信息更新方法
+    update(content) {
+        console.log(`${this._name}收到的招聘信息：${content}`)
+    }
+}
+
+// 创建订阅者郭靖
+const guojing = new Subscriber('郭靖')
+// 创建订阅者杨过
+const yangguo = new Subscriber('杨过')
+// 创建订阅者欧阳锋
+const ouyangfeng = new Subscriber('欧阳锋')
+// 郭靖只订阅前端的岗位信息
+guojing.follow('frontEnd')
+// 杨过只订阅后端的岗位信息
+yangguo.follow('backEnd')
+// 欧阳锋只订阅运维的岗位信息
+ouyangfeng.follow('DevOps')
+// 公司发布前端工程师岗位
+company.setPost('frontEnd', '前端工程师')
+// 公司发布后端工程师岗位
+company.setPost('backEnd', '后端工程师')
+// 公司发布运维工程师岗位
+company.setPost('DevOps', '运维工程师')
+    </script>
+  <body>
+</html>
