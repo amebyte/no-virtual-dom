@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>依赖追踪的基础 —— 发布订阅模式</title>
+  </head>
+  <body>
+    <script>
+// 定义事件总线
+class EventBus {
+    constructor() {
+        // 订阅者的记录列表
+        this._events = {}
+    }
+    // 添加订阅者
+    on(event, sub) {
+        // 如果还没有订阅过此类消息，则给该类消息创建一个记录列表
+        if(!this._events[event]){
+            this._events[event] = []
+        }
+        // 把订阅者添加进记录列表
+        this._events[event].push(sub)
+    }
+    // 发射事件
+    emit(event, content) {
+        // 发布信息时就是把记录列表中的订阅者全部通知一次
+        this._events[event].forEach(sub => sub.update(content))
+    }
+    // 取消订阅
+    off(event, sub) {
+        // 找到需要删除的订阅者
+        const index = this._events[event].indexOf(sub)
+        // 删除订阅者
+        this._events[event].splice(index, 1 )
+    }
+}
+
+// 实例化事件总线
+const evtBus = new EventBus()
+// 发布者招聘公司
+class CompanyObservable {
+    constructor(companyName = '') {
+        // 公司名称
+        this._companyName = companyName
+        // 岗位信息
+        this.post = {
+            // 前端岗位信息
+            frontEnd: '',
+            // 后端的岗位信息
+            backEnd: '',
+            // 运维的岗位信息
+            DevOps: '' 
+        }
+    }
+    // 发布岗位
+    setPost(event, value) {
+        this.post[event] = value
+        // 岗位更新了，通过中介通知所有的订阅者
+        evtBus.emit(event, { companyName: this._companyName, post: value })
+    }
+}
+
+class Subscriber {
+    constructor(name) {
+        // 求职者名称
+        this._name = name
+    }
+    // 订阅，添加订阅事件类型参数
+    follow(event) {
+        evtBus.on(event, this) 
+    }
+    // 取消订阅
+    unfollow(event) {
+        evtBus.off(event, this) 
+    }
+    // 接受招聘公司信息更新方法
+    update(content) {
+        console.log(`${this._name}收到${content.companyName}的招聘信息：${content.post}`)
+    }
+}
+
+// 实例化发布者掘金公司
+const juejin = new CompanyObservable('掘金')
+// 实例化发布者阿里巴巴
+const ali = new CompanyObservable('阿里巴巴')
+// 实例化订阅者郭靖
+const guojing = new Subscriber('郭靖')
+// 实例化订阅者杨过
+const yangguo = new Subscriber('杨过')
+
+// 郭靖订阅前端的招聘信息
+guojing.follow('frontEnd')
+// 杨过订阅后端的招聘信息
+yangguo.follow('backEnd')
+
+// 掘金发布前端的岗位信息
+juejin.setPost('frontEnd', '前端工程师')
+// 阿里巴巴发布后端岗位信息
+ali.setPost('backEnd', '后端工程师')
+    </script>
+  <body>
+</html>
