@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>依赖追踪的基础 —— 发布订阅模式</title>
+  </head>
+  <body>
+    <script>
+// 定义公众号
+const weChatOfficialAccount = {
+    // 订阅公众号的人的记录列表
+    subscribers: [],
+    // 文章内容
+    article: '',
+    // 添加订阅者
+    addDep(fn) {
+        // 把订阅者添加进记录列表
+        this.subscribers.push(fn) 
+    },
+    // 广播信息
+    notify(title) {
+        // 发布信息时就是把记录列表中的订阅者全部通知一次
+        this.subscribers.forEach(fn => fn(this.article))
+    },
+    // 取消订阅
+    remove(fn) { 
+        // 找到需要删除的订阅者
+        const index = this.subscribers.indexOf(fn)
+        // 删除订阅者
+        this.subscribers.splice(index, 1 )
+    }
+}
+
+defineReactive(weChatOfficialAccount, 'article', weChatOfficialAccount.article)
+
+function defineReactive(data, key, val) {
+    Object.defineProperty(data, key, {
+        get() {
+            // 存在订阅者就进行订阅操作
+            if (subscriber) weChatOfficialAccount.addDep(subscriber)
+            return val
+        },
+        set(newVal) {
+            val = newVal
+            // 通知所有的订阅者
+            weChatOfficialAccount.notify()
+        }
+    })
+}
+
+// 订阅者小明
+let subscriber = () => {
+    console.log(`收到的公众号文章：${weChatOfficialAccount.article}`)
+}
+
+// 读取一次，触发 getter 进行订阅
+weChatOfficialAccount.article
+// 设置为 null 防止重复订阅
+subscriber = null
+// 公众号发布文章则直接通过给属性赋值的方式
+weChatOfficialAccount.article = '通过 Object.defineProperty 方法实现订阅发布模式'
+    </script>
+  <body>
+</html>
