@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>从发布订阅模式的角度理解 Vue 的数据响应式原理</title>
+  </head>
+  <body>
+    <script>
+class Dep {
+  constructor() {
+    // 订阅者存储中心
+    this.subs = []
+  }
+  // 添加订阅者
+  addSub(sub) {
+    this.subs.push(sub)
+  }
+  // 通知订阅者
+  notify() {
+    this.subs.forEach(sub => sub())
+  }
+}
+
+function defineReactive(data, key, val) {
+    // 获取消息代理对象
+    const dep = weChatOfficialAccount.__ob__
+    Object.defineProperty(data, key, {
+        get() {
+            // 存在订阅者就进行订阅操作
+            if (subscriber && key === 'article') dep.addSub(subscriber)
+            if (guojingSubscriber && key === 'author') dep.addSub(guojingSubscriber)
+            if (yangguoSubscriber && key === 'date') dep.addSub(yangguoSubscriber)
+            return val
+        },
+        set(newVal) {
+            val = newVal
+            // 通知所有的订阅者
+            dep.notify()
+        }
+    })
+}
+
+// 定义公众号
+const weChatOfficialAccount = {
+    // 消息代理对象
+    __ob__: new Dep(),
+    // 文章内容
+    article: '',
+    author: '',
+    date: ''
+}
+
+defineReactive(weChatOfficialAccount, 'article', weChatOfficialAccount.article)
+defineReactive(weChatOfficialAccount, 'author', weChatOfficialAccount.author)
+defineReactive(weChatOfficialAccount, 'date', weChatOfficialAccount.date)
+
+// 订阅者小明
+let subscriber = () => {
+    console.log(`收到的公众号文章：${weChatOfficialAccount.article}`)
+}
+
+// 订阅者郭靖
+let guojingSubscriber = () => {
+    console.log(`郭靖收到的公众号文章作者：${weChatOfficialAccount.author}`)
+} 
+// 订阅者杨过
+let yangguoSubscriber = () => {
+    console.log(`杨过收到的公众号发布时间：${weChatOfficialAccount.date}`)
+}
+
+// 读取一次，触发 getter 进行订阅
+weChatOfficialAccount.article
+weChatOfficialAccount.author
+weChatOfficialAccount.date
+// 设置为 null 防止重复订阅
+subscriber = null
+guojingSubscriber = null
+yangguoSubscriber = null
+// 公众号发布文章则直接通过给属性赋值的方式
+weChatOfficialAccount.article = '通过 Object.defineProperty 方法实现订阅发布模式'
+    </script>
+  <body>
+</html>
