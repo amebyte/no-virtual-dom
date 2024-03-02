@@ -25,24 +25,25 @@
                 writable: true, // 值是否可写，默认为 false
                 configurable: true // 属性是否可配置，默认为 false
             })
-            Object.keys(data).forEach(key => {
-                const value = data[key]
-                if (Array.isArray(value)) {
-                    // 如果是数组则重新数组上的原型
-                    value.__proto__ = {
-                        join(val) {
-                            // 通过原生数组上方法进行调用
-                            return Array.prototype.join.call(value, val)
-                        },
-                        push(val) {
-                            // 通过原生数组上的方法进行调用
-                            Array.prototype.push.call(value, val)
-                            subscriber.forEach(sub => sub())
-                        }
+            if (Array.isArray(data)) {
+                // 如果是数组则重新数组上的原型
+                data.__proto__ = {
+                    join(val) {
+                        // 通过原生数组上方法进行调用
+                        return Array.prototype.join.call(data, val)
+                    },
+                    push(val) {
+                        // 通过原生数组上的方法进行调用
+                        Array.prototype.push.call(data, val)
+                        subscriber.forEach(sub => sub())
                     }
                 }
-                defineReactive(data, key, value) 
-            })
+            } else {
+                Object.keys(data).forEach(key => {
+                    const value = data[key]
+                    defineReactive(data, key, value) 
+                })
+            }
         }
 
         function defineReactive(data, key, val) {
@@ -52,7 +53,7 @@
                     if(activeEffect) {
                         subscriber.add(activeEffect)
                         // 如果读取的值是对象，那么还要给这个对象进行依赖收集，并且新的对象也要通过 Observer 进行监听
-                        if(Object.prototype.toString.call(val) === '[object Object]') {
+                        if(val !== null && typeof val === 'object') {
                             Observer(val)
                             val.__ob__.add(activeEffect)
                         }
@@ -77,7 +78,7 @@
         }
 
         // 数据
-        const data = { arr: ['cobyte'] }
+        const data = { arr: ['cobyte']}
         // 通过 Observer 处理
         Observer(data)
         
