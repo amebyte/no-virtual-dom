@@ -57,6 +57,8 @@ function observe (data) {
     // 如果是数组则重写数组上的原型
     if (Array.isArray(data)) {
         protoAugment(data)
+        // 对数组的每一项都进行响应式处理
+        observeArray(args)
     } else {
         walk(data)
     }
