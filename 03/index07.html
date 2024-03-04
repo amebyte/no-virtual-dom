@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>从发布订阅模式的角度理解 Vue 的数据响应式原理</title>
+  </head>
+  <body>
+    <script>
+// 判断是否是对象
+function isObject(obj) {
+    return obj !== null && typeof obj === 'object'
+}
+class Dep {
+  constructor() {
+    // 订阅者存储中心
+    this.subs = []
+  }
+  // 添加订阅者
+  addSub(sub) {
+    this.subs.push(sub)
+  }
+  // 通知订阅者
+  notify() {
+    this.subs.forEach(sub => sub.update())
+  }
+}
+
+function defineReactive(data, key) {
+    let val = data[key]
+    // 获取消息代理对象
+    const dep = new Dep()
+    const childOb = observe(val)
+    Object.defineProperty(data, key, {
+        get() {
+            // 存在订阅者中间变量就进行订阅者添加
+            if (Dep.target){
+                dep.addSub(Dep.target)
+                // 如果存在 childOb 则说明属性值是一个对象，则也需要对该对象进行订阅者收集，从发布订阅模式的角度看，这是一个订阅操作
+                if (childOb) childOb.dep.addSub(Dep.target)
+            }
+            return val
+        },
+        set(newVal) {
+            val = newVal
+            // 通知所有的订阅者
+            dep.notify()
+        }
+    })
+}
+
+// 获取数组原型
+const arrayProto = Array.prototype
+// 通过 Object.create 创建一个原型为 arrayProto 的空对象
+const arrayMethods = Object.create(arrayProto)
+// 修改 push 方法
+arrayMethods['push'] = function (...args) {
+    const ob = this.__ob__
+    // 获取原始方法
+    const original = arrayProto['push']
+    // 执行原始方法
+    const result = original.apply(this, args)
+    // 因为执行 push 方法，数组数据有变化所以需要通知订阅者
+    ob.dep.notify()
+    // 同时对新添加的数据也进行响应式化
+    ob.observeArray(args)
+}
+
+class Observer {
+    constructor(value) {
+        this.value = value
+        this.dep = new Dep()
+        this.value.__ob__ = this
+        if (Array.isArray(value)) {
+            // 对数组进行响应式处理
+            this.protoAugment(value, arrayMethods)
+            // 对数组的每一项都进行响应式处理
+            this.observeArray(value)
+        } else {
+            // 对对象进行响应式处理
+            this.walk(value)
+        }
+    }
+
+    protoAugment(target, src) {
+        // 覆盖原型对象
+        target.__proto__ = src
+    }
+
+    // 对对象进行响应式处理
+    walk(obj) {
+        const keys = Object.keys(obj)
+        keys.forEach(key => {
+            // 如果属性不是 __ob__ 则进行监听
+            if (key !== '__ob__')  defineReactive(obj, key) 
+        })
+    }
+    // 对数组的每一项元素都进行响应式处理
+    observeArray (items) {
+        for (let i = 0, l = items.length; i < l; i++) {
+            observe(items[i])
+        }
+    }
+}
+
+class Watcher {
+    constructor(fn, cb) {
+        this.cb = cb
+        // 让每个订阅者所需要做的事情通过参数的形式传进来，这样更灵活，拓展性更强
+        this.getter = fn
+        // 初始化的时候直接读取触发订阅者收集，因为这样设计符合 web 应用的特性
+        this.value = this.get()
+    }
+    get() {
+        let value
+        // 通过 Dep.target 来设置当前的订阅者是谁
+        Dep.target = this
+        value = this.getter()
+        Dep.target = null
+        return value
+    }
+    // 接受发布者通知的更新方法
+    update() {
+      // 获取新值
+      const value = this.getter()
+      // 设置旧值
+      const oldValue = this.value
+      // 更新值
+      this.value = value
+      if (this.cb) {
+        // 因为是用户写的，有可能存在错误
+        try {
+          this.cb(value, oldValue)
+        } catch(err) {
+          throw err
+        }
+      }
+    }
+}
+
+function observe (data) {
+    // 不是对象则直接返回
+    if (!isObject(data)) return
+    const ob = new Observer(data)
+    // 返回消息代理对象
+    return ob
+}
+
+function $watcher(expOrFn, cb, options) {
+    // 因为 options 有可能不存在，要做兼容处理
+    options = options || {}
+    const watcher = new Watcher(expOrFn, cb, options)
+    // 如果 immediate 为 true 则立即执行回调函数 
+    if (options.immediate) {
+      try {
+        cb(watcher.value)
+      } catch (error) {
+        throw new Error(error)
+      }
+    }
+}
+
+
+// 定义公众号
+const weChatOfficialAccount = {
+    // 文章内容
+    article: 'hhhh',
+    author: '',
+    date: '',
+    arr: ['掘金']
+}
+observe(weChatOfficialAccount)
+
+$watcher(function() {
+    return `要做的事情，获取文章：${weChatOfficialAccount.article}`
+}, function(newValue, oldValue) {
+    console.log(`新结果是：${newValue}，旧结果是：${oldValue}`)
+}, { immediate: true })
+    </script>
+  <body>
+</html>
