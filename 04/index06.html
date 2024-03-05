@@ -1,0 +1,77 @@
+!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>从发布订阅模式的角度理解 Vue 的数据响应式原理</title>
+  </head>
+  <body>
+    <script>
+class Dep {
+  constructor() {
+    // 订阅者存储中心
+    this.subs = new Map()
+  }
+  // 添加订阅者
+  addSub(target, key, sub) {
+    let depsMap = this.subs.get(target)
+    if (!depsMap) {
+        depsMap = new Map()
+        this.subs.set(target, depsMap)
+    }
+    let deps = depsMap.get(key)
+    if (!deps) {
+      deps = new Set()
+      depsMap.set(key, deps)
+    }
+    deps.add(sub)
+  }
+  // 通知订阅者
+  notify(target, key) {
+    const depsMap = this.subs.get(target)
+    if (!depsMap) return
+    const effects = depsMap.get(key)
+    effects && effects.forEach(sub => sub())
+  }
+}
+const dep = new Dep()
+let activeEffect
+// reactive
+function reactive(data) {
+    return new Proxy(data, {
+        get(target, key) {
+            // 存在依赖就把依赖收集到依赖存储中心
+            activeEffect && dep.addSub(target, key, activeEffect)
+            return Reflect.get(target, key) 
+        },
+        set(target, key, val) {
+            const result = Reflect.set(target, key, val)
+            // 值更新了，就需要去把依赖存储中心中的依赖全部重新执行一遍
+            dep.notify(target, key)
+            return result
+        }
+    })
+}
+
+const proxy = reactive({ author: 'Cobyte', date: '2024-03-05' })
+
+const proxy2 = reactive({ author: 'Cobyte2' })
+// 订阅者
+const subscriber = () => {
+    console.log(`我是：${proxy.author}`)
+}
+// 订阅者2
+const subscriber2 = () => {
+    console.log(`我是：${proxy2.author}`)
+}
+activeEffect = subscriber
+subscriber()
+activeEffect = subscriber2
+subscriber2()
+activeEffect = null
+
+// 修改
+proxy.author = 'coboy'
+
+</script>
+  <body>
+</html>
