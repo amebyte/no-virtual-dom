@@ -6,6 +6,16 @@
   </head>
   <body>
     <script>
+class ReactiveEffect {
+    constructor(fn) {
+        this._fn = fn
+    }
+    run () {
+        // 根据 Vue2 的数据响应式原理，我们知道在执行具体订阅者函数之前需要把当前订阅者赋值给一个中间变量。
+        activeEffect = this
+        this._fn()
+    }
+}
 class Dep {
   constructor() {
     // 订阅者存储中心
@@ -32,7 +42,7 @@ class Dep {
     const depsMap = this.subs.get(target)
     if (!depsMap) return
     const effects = depsMap.get(key)
-    effects && effects.forEach(sub => sub())
+    effects && effects.forEach(dep => dep.run())
   }
 }
 const dep = new Dep()
@@ -55,24 +65,11 @@ function reactive(data) {
 }
 
 const proxy = reactive({ author: 'Cobyte', date: '2024-03-05' })
-
-const proxy2 = reactive({ author: 'Cobyte2' })
-// 订阅者
-const subscriber = () => {
+const _effect = new ReactiveEffect(() => {
     console.log(`我是：${proxy.author}`)
-}
-// 订阅者2
-const subscriber2 = () => {
-    console.log(`我是：${proxy2.author}`)
-}
-activeEffect = subscriber
-subscriber()
-activeEffect = subscriber2
-subscriber2()
-activeEffect = null
-
-// 修改
-proxy.author = 'coboy'
+})
+_effect.run()
+proxy.author = 'coboy' 
 
 </script>
   <body>
