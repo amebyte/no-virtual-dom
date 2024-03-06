@@ -12,7 +12,7 @@ class Dep {
     this.subs = new Map()
   }
   // 添加订阅者
-  addSub(target, key, sub) {
+  addSub(target, key) {
     let depsMap = this.subs.get(target)
     if (!depsMap) {
         depsMap = {}
@@ -22,7 +22,9 @@ class Dep {
     if (!depsMap[key]) {
         depsMap[key] = new Set()
     }
-    depsMap[key].add(sub)
+    if (activeEffect) {
+        depsMap[key].add(activeEffect)
+    }
   }
   // 通知订阅者
   notify(target, key) {
@@ -39,7 +41,7 @@ function reactive(data) {
     return new Proxy(data, {
         get(target, key) {
             // 存在依赖就把依赖收集到依赖存储中心
-            activeEffect && dep.addSub(target, key, activeEffect)
+            dep.addSub(target, key)
             return Reflect.get(target, key) 
         },
         set(target, key, val) {

@@ -12,11 +12,13 @@ class Dep {
     this.subs = {}
   }
   // 添加订阅者
-  addSub(key, sub) {
+  addSub(key) {
     if (!this.subs[key]) {
       this.subs[key] = []
     }
-    this.subs[key].push(sub)
+    if (activeEffect) {
+        this.subs[key].push(activeEffect)
+    }
   }
   // 通知订阅者
   notify(key) {
@@ -30,7 +32,7 @@ function reactive(data) {
     return new Proxy(data, {
         get(target, key) {
             // 存在依赖就把依赖收集到依赖存储中心
-            activeEffect && dep.addSub(key, activeEffect)
+            dep.addSub(key)
             return Reflect.get(target, key) 
         },
         set(target, key, val) {

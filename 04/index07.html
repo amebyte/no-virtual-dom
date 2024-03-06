@@ -2,27 +2,37 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>从发布订阅模式的角度理解 Vue3 的数据响应式原理</title>
+    <title>从发布订阅模式的角度理解 Vue 的数据响应式原理</title>
   </head>
   <body>
     <script>
 class Dep {
   constructor() {
     // 订阅者存储中心
-    this.subs = {}
+    this.subs = new WeakMap()
   }
   // 添加订阅者
-  addSub(key) {
-    if (!this.subs[key]) {
-      this.subs[key] = []
+  addSub(target, key) {
+    let depsMap = this.subs.get(target)
+    if (!depsMap) {
+        depsMap = new Map()
+        this.subs.set(target, depsMap)
+    }
+    let deps = depsMap.get(key)
+    if (!deps) {
+      deps = new Set()
+      depsMap.set(key, deps)
     }
     if (activeEffect) {
-        this.subs[key].push(activeEffect)
+        deps.add(activeEffect)
     }
   }
   // 通知订阅者
-  notify(key) {
-    this.subs[key].forEach(sub => sub())
+  notify(target, key) {
+    const depsMap = this.subs.get(target)
+    if (!depsMap) return
+    const effects = depsMap.get(key)
+    effects && effects.forEach(sub => sub())
   }
 }
 const dep = new Dep()
@@ -32,13 +42,13 @@ function reactive(data) {
     return new Proxy(data, {
         get(target, key) {
             // 存在依赖就把依赖收集到依赖存储中心
-            dep.addSub(key)
+            dep.addSub(target, key)
             return Reflect.get(target, key) 
         },
         set(target, key, val) {
             const result = Reflect.set(target, key, val)
             // 值更新了，就需要去把依赖存储中心中的依赖全部重新执行一遍
-            dep.notify(key)
+            dep.notify(target, key)
             return result
         }
     })
@@ -46,13 +56,14 @@ function reactive(data) {
 
 const proxy = reactive({ author: 'Cobyte', date: '2024-03-05' })
 
+const proxy2 = reactive({ author: 'Cobyte2' })
 // 订阅者
 const subscriber = () => {
     console.log(`我是：${proxy.author}`)
 }
 // 订阅者2
 const subscriber2 = () => {
-    console.log(`日期是：${proxy.date}`)
+    console.log(`我是：${proxy2.author}`)
 }
 activeEffect = subscriber
 subscriber()
@@ -62,6 +73,7 @@ activeEffect = null
 
 // 修改
 proxy.author = 'coboy'
-    </script>
+
+</script>
   <body>
 </html>
