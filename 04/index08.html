@@ -72,18 +72,23 @@ function reactive(data) {
 function effect(fn) {
     const _effect = new ReactiveEffect(fn)
     _effect.run()
-    return _effect
+    const runner = _effect.run.bind(_effect)
+    runner.effect = _effect
+    return runner 
 }
 
 const proxy = reactive({ author: 'Cobyte', date: '2024-03-05' })
 
-const _effect = effect(() => {
+const runner = effect(() => {
   console.log(`我是：${proxy.author}`)
 })
 proxy.author = 'Coboy'
 // 取消订阅，也就是取消依赖追踪
-_effect.stop()
-proxy.author = '掘金签约作者' 
+runner.effect.stop()
+proxy.author = '掘金签约作者'
+// 恢复依赖追踪
+runner()
+proxy.author = '恢复依赖追踪了' 
 
 </script>
   <body>
