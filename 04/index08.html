@@ -7,6 +7,7 @@
   <body>
     <script>
 class ReactiveEffect {
+    deps = []
     constructor(fn) {
         this._fn = fn
     }
@@ -14,6 +15,9 @@ class ReactiveEffect {
         // 根据 Vue2 的数据响应式原理，我们知道在执行具体订阅者函数之前需要把当前订阅者赋值给一个中间变量。
         activeEffect = this
         this._fn()
+    }
+    stop () {
+      this.deps.forEach(dep => dep.delete(this))
     }
 } 
 class Dep {
@@ -35,6 +39,7 @@ class Dep {
     }
     if (activeEffect) {
         deps.add(activeEffect)
+        activeEffect.deps.push(deps)
     }
   }
   // 通知订阅者
@@ -67,14 +72,18 @@ function reactive(data) {
 function effect(fn) {
     const _effect = new ReactiveEffect(fn)
     _effect.run()
+    return _effect
 }
 
 const proxy = reactive({ author: 'Cobyte', date: '2024-03-05' })
-const _effect = new ReactiveEffect(() => {
-    console.log(`我是：${proxy.author}`)
+
+const _effect = effect(() => {
+  console.log(`我是：${proxy.author}`)
 })
-_effect.run()
-proxy.author = 'coboy' 
+proxy.author = 'Coboy'
+// 取消订阅，也就是取消依赖追踪
+_effect.stop()
+proxy.author = '掘金签约作者' 
 
 </script>
   <body>
