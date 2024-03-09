@@ -75,18 +75,20 @@ function effect(fn) {
 
 class RefImpl {
     _value
-    constructor(value) {
+    dep
+    constructor(value) {                                                                                                            
         this._value = value
+        this.dep = new Set()
     }
     get value() {
        // 存在依赖就把依赖收集到依赖存储中心
-       activeEffect && subscribers.add(activeEffect)
+       activeEffect && this.dep.add(activeEffect)                                                                                              
        return this._value 
     }
     set value(val) {
         this._value = val
         // 值更新了，就需要去把依赖存储中心中的依赖全部重新执行一遍
-        subscribers.forEach(sub => sub())
+        this.dep.forEach(sub => sub())
     }
 }
 
