@@ -78,7 +78,11 @@ const weChatOfficialAccount = {
     // 订阅公众号的人的记录列表
     subscribers: [],
     // 文章内容
-    article: '',
+    article: '原始内容',
+    getArticle() {
+        if (activeEffect) this.addDep(activeEffect)
+        return this.article
+    },
     // 发布文章
     setArticle(value) {
         this.article = value
@@ -91,12 +95,17 @@ const weChatOfficialAccount = {
         this.subscribers.push(fn) 
     },
     // 广播信息
-    notify(title) {
+    notify() {
         // 发布信息时就是把记录列表中的订阅者全部通知一次
-        this.subscribers.forEach(fn => fn(title));
+        this.subscribers.forEach(dep => dep.run());
     }
 }
 
+effect(() => {
+    console.log(`原始值内容：${weChatOfficialAccount.getArticle()}`)
+})
+
+weChatOfficialAccount.setArticle(520)
 
 </script>
   <body>
