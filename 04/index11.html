@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>从发布订阅模式的角度理解 Vue 的数据响应式原理</title>
+  </head>
+  <body>
+    <script>
+class ReactiveEffect {
+    deps = []
+    constructor(fn) {
+        this._fn = fn
+    }
+    run () {
+        // 根据 Vue2 的数据响应式原理，我们知道在执行具体订阅者函数之前需要把当前订阅者赋值给一个中间变量。
+        activeEffect = this
+        this._fn()
+    }
+    stop () {
+      this.deps.forEach(dep => dep.delete(this))
+    }
+} 
+// 订阅者存储中心
+const targetMap  = new WeakMap()
+  // 添加订阅者
+function track(target, key) {
+    let depsMap = targetMap.get(target)
+    if (!depsMap) {
+        depsMap = new Map()
+        targetMap.set(target, depsMap)
+    }
+    let deps = depsMap.get(key)
+    if (!deps) {
+      deps = new Set()
+      depsMap.set(key, deps)
+    }
+    if (activeEffect) {
+        deps.add(activeEffect)
+        activeEffect.deps.push(deps)
+    }
+}
+  // 通知订阅者
+function trigger(target, key) {
+    const depsMap = targetMap.get(target)
+    if (!depsMap) return
+    const effects = depsMap.get(key)
+    effects && effects.forEach(dep => dep.run())
+}
+
+let activeEffect
+// reactive
+function reactive(data) {
+    return new Proxy(data, {
+        get(target, key) {
+            // 存在依赖就把依赖收集到依赖存储中心
+            track(target, key)
+            return Reflect.get(target, key) 
+        },
+        set(target, key, val) {
+            const result = Reflect.set(target, key, val)
+            // 值更新了，就需要去把依赖存储中心中的依赖全部重新执行一遍
+            trigger(target, key)
+            return result
+        }
+    })
+}
+
+function effect(fn) {
+    const _effect = new ReactiveEffect(fn)
+    _effect.run()
+    const runner = _effect.run.bind(_effect)
+    runner.effect = _effect
+    return runner 
+}
+
+// 定义发布者公众号
+function ref(value) {
+    return {
+        // 订阅公众号的人的记录列表
+        subscribers: [],
+        // 文章内容
+        _value: value,
+        get article() {
+            if (activeEffect) this.addDep(activeEffect)
+            return this._value
+        },
+        // 发布文章
+        set article(value) {
+            this._value = value
+            // 更新文章的时候通知所有的订阅者
+            this.notify()
+        },
+        // 添加订阅者
+        addDep(fn) {
+            // 把订阅者添加进记录列表
+            this.subscribers.push(fn) 
+        },
+        // 广播信息
+        notify() {
+            // 发布信息时就是把记录列表中的订阅者全部通知一次
+            this.subscribers.forEach(dep => dep.run());
+        }
+    }
+}
+
+const weChatOfficialAccount = ref('初始值')
+effect(() => {
+    console.log(`原始值内容：${weChatOfficialAccount.article}`)
+})
+// 更改内容
+weChatOfficialAccount.article = 520
+
+</script>
+  <body>
+</html>
