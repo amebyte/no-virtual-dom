@@ -22,7 +22,7 @@ class ReactiveEffect {
 } 
 // 订阅者存储中心
 const targetMap  = new WeakMap()
-// 添加订阅者
+  // 添加订阅者
 function track(target, key) {
     let depsMap = targetMap.get(target)
     if (!depsMap) {
@@ -35,16 +35,27 @@ function track(target, key) {
       depsMap.set(key, dep)
     }
     if (activeEffect) {
-        dep.add(activeEffect)
-        activeEffect.deps.push(dep)
+        trackEffect(dep)
     }
 }
-// 通知订阅者
+
+function trackEffect(dep) {
+    dep.add(activeEffect)
+    activeEffect.deps.push(dep)
+}
+
+  // 通知订阅者
 function trigger(target, key) {
     const depsMap = targetMap.get(target)
     if (!depsMap) return
     const deps = depsMap.get(key)
-    deps && deps.forEach(effect => effect.run())
+    triggerEffect(deps)
+}
+
+function triggerEffect(deps) {
+    if(deps) {
+        deps.forEach(effect => effect.run());
+    }
 }
 
 let activeEffect
@@ -77,38 +88,28 @@ function effect(fn) {
 function ref(value) {
     return {
         // 订阅公众号的人的记录列表
-        subscribers: [],
+        dep: new Set(),
         // 文章内容
         _value: value,
-        get article() {
-            if (activeEffect) this.addDep(activeEffect)
+        get value() {
+            if (activeEffect) trackEffect(this.dep)
             return this._value
         },
         // 发布文章
-        set article(value) {
+        set value(value) {
             this._value = value
             // 更新文章的时候通知所有的订阅者
-            this.notify()
+            triggerEffect(this.dep)
         },
-        // 添加订阅者
-        addDep(fn) {
-            // 把订阅者添加进记录列表
-            this.subscribers.push(fn) 
-        },
-        // 广播信息
-        notify() {
-            // 发布信息时就是把记录列表中的订阅者全部通知一次
-            this.subscribers.forEach(dep => dep.run());
-        }
     }
 }
 
 const weChatOfficialAccount = ref('初始值')
 effect(() => {
-    console.log(`原始值内容：${weChatOfficialAccount.article}`)
+    console.log(`原始值内容：${weChatOfficialAccount.value}`)
 })
 // 更改内容
-weChatOfficialAccount.article = 520
+weChatOfficialAccount.value = 520
 
 </script>
   <body>
