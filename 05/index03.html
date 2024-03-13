@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>手写 React 响应式状态库 Mobx</title>
+  </head>
+  <body>
+    <script>
+      const globalState = {
+        allowStateChanges: false
+      }
+      function isObject(obj) {
+        return obj !== null && typeof obj === 'object'
+      }
+
+      class ObservableObjectAdministration {
+        constructor(target, values = new Map()) {
+          this.target_ = target
+          this.values_ = values
+        }
+
+        getObservablePropValue_(key) {
+          return this.values_.get(key).get()
+        }
+
+        setObservablePropValue_(key, value) {
+          const observable = this.values_.get(key)
+          observable.setNewValue(value)
+          return true
+        }
+
+        extend(key, value) {
+          if (typeof value !== 'function') {
+            this.defineObservableProperty_(key, value)
+          } else {
+            const handler = value.bind(this.target_)
+            function action (...agrs) {
+              globalState.allowStateChanges = true
+              handler(...agrs)
+              globalState.allowStateChanges = false
+            }
+            this.defineProperty_(key, action)
+          }
+        }
+
+        defineProperty_(key, value) {
+          Object.defineProperty(this.target_, key, {
+            value
+          })
+        }
+
+        defineObservableProperty_(key, value) {
+          const getter = function() {
+            return this.getObservablePropValue_(key)
+          }
+          const setter = function(val) {
+            return this.setObservablePropValue_(key, val)
+          }
+          Object.defineProperty(this.target_, key, {
+            get: getter.bind(this),
+            set: setter.bind(this)
+          })
+          if (typeof value !== 'function') {
+            const observable = new ObservableValue(value)
+            this.values_.set(key, observable)
+          }
+        } 
+      }
+
+      let activeEffect
+      class ObservableValue {
+        constructor(value) {
+          this.value_ = value
+          this.observers_ = new Set()
+        }
+
+        get() {
+          if (activeEffect) this.observers_.add(activeEffect) 
+          return this.value_
+        }
+
+        setNewValue(value) {
+          checkIfStateModificationsAreAllowed(this)
+          this.value_ = value
+          this.observers_.forEach(sub => sub())
+          return true
+        }
+      }
+
+      function checkIfStateModificationsAreAllowed(atom) {
+        // const hasObservers = atom.observers_.size > 0
+        if (!globalState.allowStateChanges) {
+          console.warn('Since strict-mode is enabled, changing (observed) observable values without using an action is not allowed')
+        }
+      }
+
+      function observable (value) {
+        if (isObject(value)) {
+          const adm = new ObservableObjectAdministration(value)
+          value.__ob__ = adm
+          Object.keys(value).forEach(key => {
+            adm.extend(key, value[key])
+          })
+          return value
+        }
+      }
+
+      const proxy = observable({
+        name: 'Cobyte',
+        update(value) {
+          console.log('update', value, this)
+          this.name = value
+        }
+      })
+
+      const subscribers = function() {
+        console.log(`我是：${proxy.name}`)
+      }
+
+
+      activeEffect = subscribers
+      subscribers()
+      activeEffect = null
+
+      // proxy.update('掘金签约作者')
+      proxy.name = '掘金签约作者'
+
+    </script>
+  <body>
+</html>
