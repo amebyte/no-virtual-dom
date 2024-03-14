@@ -104,7 +104,6 @@
       }
 
       function checkIfStateModificationsAreAllowed(atom) {
-        // const hasObservers = atom.observers_.size > 0
         if (!globalState.allowStateChanges) {
           console.warn('Since strict-mode is enabled, changing (observed) observable values without using an action is not allowed')
         }
