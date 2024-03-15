@@ -150,12 +150,15 @@
       }
 
       function makeAutoObservable(target) {
-        console.log('target', target)
         if (isObject(target)) {
           const adm = new ObservableObjectAdministration(target)
           target.__ob__ = adm
-          Object.keys(target).forEach(key => {
-            console.log('key', key)
+          const proto = Object.getPrototypeOf(target)
+          Reflect.ownKeys
+          const keys = new Set([...Reflect.ownKeys(target), ...Reflect.ownKeys(proto)])
+          keys.delete("constructor")
+          keys.delete('__ob__')
+          keys.forEach(key => {
             adm.extend(key, target[key])
           })
           return target
