@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>手写 React 响应式状态库 Mobx</title>
+  </head>
+  <body>
+    <script>
+      const globalState = {
+        allowStateChanges: false,
+        trackingDerivation: null
+      }
+      function isObject(obj) {
+        return obj !== null && typeof obj === 'object'
+      }
+
+      class ObservableObjectAdministration {
+        constructor(target, values = new Map()) {
+          this.target_ = target
+          this.values_ = values
+        }
+
+        getObservablePropValue_(key) {
+          return this.values_.get(key).get()
+        }
+
+        setObservablePropValue_(key, value) {
+          const observable = this.values_.get(key)
+          observable.setNewValue(value)
+          return true
+        }
+
+        extend(key, value) {
+          this.defineObservableProperty_(key, value)
+        }
+
+        defineProperty_(key, value) {
+          Object.defineProperty(this.target_, key, {
+            value
+          })
+        }
+
+        defineObservableProperty_(key, value) {
+          const getter = function() {
+            return this.getObservablePropValue_(key)
+          }
+          const setter = function(val) {
+            return this.setObservablePropValue_(key, val)
+          }
+          Object.defineProperty(this.target_, key, {
+            get: getter.bind(this),
+            set: setter.bind(this)
+          })
+          const observable = new ObservableValue(value)
+          this.values_.set(key, observable)
+        } 
+      }
+
+      function createAction(fn) {
+        function res() {
+          return executeAction(fn, this, arguments)
+        }
+        return res
+      }
+
+      function executeAction(fn, scope, args) {
+        globalState.allowStateChanges = true
+        try {
+            return fn.apply(scope, args)
+        } catch (err) {
+            throw err
+        } finally {
+            globalState.allowStateChanges = false
+        }
+      }
+
+      function deepEnhancer(value) {
+        if (typeof value === 'function') {
+            return createAction(value) 
+        }
+        // 如果是 observable 对象就返回，不处理
+        // 如果是对象进行递归处理
+        // 如果是数组也进行数组的递归处理
+        return value
+      }
+
+      class ObservableValue {
+        constructor(value) {
+          this.value_ = deepEnhancer(value)
+          this.observers_ = new Set()
+        }
+
+        get() {
+          if (globalState.trackingDerivation) this.observers_.add(globalState.trackingDerivation) 
+          return this.value_
+        }
+
+        setNewValue(value) {
+          checkIfStateModificationsAreAllowed(this)
+          this.value_ = value
+          this.observers_.forEach(derivation => derivation.onBecomeStale_())
+          return true
+        }
+      }
+
+      function checkIfStateModificationsAreAllowed(atom) {
+        if (!globalState.allowStateChanges) {
+          console.warn('Since strict-mode is enabled, changing (observed) observable values without using an action is not allowed')
+        }
+      }
+
+      function observable (value) {
+        if (isObject(value)) {
+          const adm = new ObservableObjectAdministration(value)
+          value.__ob__ = adm
+          Object.keys(value).forEach(key => {
+            adm.extend(key, value[key])
+          })
+          return value
+        }
+      }
+
+      class Reaction {
+        constructor(onInvalidate) {
+          this.onInvalidate_ = onInvalidate
+          this.observing = []
+        }
+
+        track(fn) {
+          globalState.trackingDerivation = this
+          fn()
+          globalState.trackingDerivation = null
+          bindDependencies(this)
+        }
+
+        onBecomeStale_() {
+          this.schedule_() 
+        }
+
+        schedule_() {
+          this.onInvalidate_()
+        }
+      }
+
+      function bindDependencies(derivation) {
+        const { observing } = derivation;
+        observing.forEach(observable => {
+          observable.observers_.add(derivation)
+        });
+      }
+
+      function makeAutoObservable(target) {
+        console.log('target', target)
+        if (isObject(target)) {
+          const adm = new ObservableObjectAdministration(target)
+          target.__ob__ = adm
+          Object.keys(target).forEach(key => {
+            console.log('key', key)
+            adm.extend(key, target[key])
+          })
+          return target
+        }
+      }
+
+    //   const proxy = observable({
+    //     name: 'Cobyte',
+    //     update(value) {
+    //       this.name = value
+    //     }
+    //   })
+
+      class Member {
+        name = 'Cobyte'
+        constructor() {
+            makeAutoObservable(this)
+        }
+        update(value) {
+            this.name = value
+        }
+      }
+
+      const proxy = new Member()
+
+      function autorun(view) {
+        const reaction = new Reaction(
+          function () {
+            this.track(view)
+          }
+        )
+        
+        reaction.schedule_()
+      }
+
+      autorun(() => {
+        console.log(`我是：${proxy.name}`)
+      })
+
+      proxy.update('掘金签约作者')
+      // proxy.name = '掘金签约作者'
+
+    </script>
+  <body>
+</html>
