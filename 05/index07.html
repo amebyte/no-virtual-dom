@@ -40,6 +40,17 @@
           })
         }
 
+        set_(key, value) {
+            this.extend(key, value)
+        }
+
+        delete_(key) {
+            const observable = this.values_.get(key)
+            delete this.target_[key]
+            this.values_.delete(key)
+            observable.observers_.forEach(derivation => derivation.onBecomeStale_())
+        }
+
         defineObservableProperty_(key, value) {
           const getter = function() {
             return this.getObservablePropValue_(key)
