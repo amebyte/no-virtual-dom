@@ -70,7 +70,7 @@
       function reportObserved(observable) {
         const derivation = globalState.trackingDerivation
         if (derivation) {
-            this.observers_.add(derivation)
+            observable.observers_.add(derivation)
         }
       }
 
@@ -113,7 +113,7 @@
         }
 
         get() {
-          
+            reportObserved(this)
           return this.value_
         }
 
