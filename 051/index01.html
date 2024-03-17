@@ -14,6 +14,35 @@
                 // 订阅者存储中心
                 this.values_ = new Map()
             }
+
+            defineObservableProperty_(key, value) {
+                Object.defineProperty(this.target_, key, {
+                    get: () => {
+                        return this.values_.get(key).get()
+                    },
+                    set: (val) => {
+                        this.values_.get(key).setNewVal(val)
+                    }
+                })
+                const observable = new ObservableValue(value)
+                this.values_.set(key, observable)
+            }
+        }
+        // 将属性值包装成响应式对象
+        class ObservableValue {
+            constructor(value) {
+                this.value_ = value
+            }
+
+            get() {
+                // 在这里进行依赖收集
+                return this.value_
+            }
+
+            setNewVal(val) {
+                this.value_ = val
+                // 在这里进行依赖触发
+            }
         }
 
         function observable(target) {
@@ -24,6 +53,7 @@
             })
             return target
         }
+        
     </script>
   <body>
 </html>
