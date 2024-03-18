@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>手写 React 响应式状态库 Mobx</title>
+  </head>
+  <body>
+    <script>
+        // 全局属性
+        const globalState = {
+          trackingDerivation: null // Mobx 中的订阅者全局变量
+        }
+        // 对象观察器
+        class ObservableObjectAdministration{
+            constructor(target) {
+                // 原始值保存
+                this.target_ = target
+                // 订阅者存储中心
+                this.values_ = new Map()
+            }
+
+            defineObservableProperty_(key, value) {
+                const observable = new ObservableValue(value)
+                this.values_.set(key, observable)
+                Object.defineProperty(this.target_, key, {
+                    get: () => {
+                        return this.values_.get(key).get()
+                    },
+                    set: (val) => {
+                        this.values_.get(key).setNewVal(val)
+                    }
+                })
+            }
+        }
+        // 将属性值包装成响应式对象
+        class ObservableValue {
+            constructor(value) {
+                this.value_ = value,
+                this.observers_ = new Set()
+            }
+
+            get() {
+                // 在这里进行依赖收集
+                if (globalState.trackingDerivation) {
+                  this.observers_.add(globalState.trackingDerivation)
+                }
+                return this.value_
+            }
+
+            setNewVal(val) {
+                this.value_ = val
+                // 在这里进行依赖触发
+                this.observers_.forEach(derivation => derivation())
+            }
+        }
+
+        function observable(target) {
+            const adm = new ObservableObjectAdministration(target)
+            target.__ob__ = adm
+            Object.keys(target).forEach(key => {
+                adm.defineObservableProperty_(key, target[key])
+            })
+            return target
+        }
+
+        const mobxProxy = observable({ name: 'Cobyte' })
+        // 设置订阅者
+        const subscriber = function() {
+          console.log(`我是：${mobxProxy.name}`)
+        }
+        
+        globalState.trackingDerivation = subscriber
+        subscriber()
+        globalState.trackingDerivation = null
+
+        // 设置值触发依赖
+        mobxProxy.name = '掘金签约作者'
+    </script>
+  <body>
+</html>
