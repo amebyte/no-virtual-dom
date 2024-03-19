@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>手写 React 响应式状态库 Mobx</title>
+  </head>
+  <body>
+    <script>
+        const globalState = {
+          trackingDerivation: null,
+          // 是否允许修改状态的开关
+          allowStateChanges: false
+        }
+        // 对象观察器
+        class ObservableObjectAdministration{
+            constructor(target) {
+                // 原始值保存
+                this.target_ = target
+                // 订阅者存储中心
+                this.values_ = new Map()
+            }
+
+            defineObservableProperty_(key, value) {
+                const observable = new ObservableValue(value)
+                this.values_.set(key, observable)
+                Object.defineProperty(this.target_, key, {
+                    get: () => {
+                        return this.values_.get(key).get()
+                    },
+                    set: (val) => {
+                        this.values_.get(key).setNewVal(val)
+                    }
+                })
+            }
+        }
+        class Reaction {
+          constructor(onInvalidate) {
+              this.onInvalidate_ = onInvalidate
+          }
+
+          track(fn) {
+              globalState.trackingDerivation = this
+              fn()
+              globalState.trackingDerivation = null
+          }
+
+          schedule_() {
+              this.onInvalidate_()
+          }
+        }
+        // 将属性值包装成响应式对象
+        class ObservableValue {
+            constructor(value) {
+              let action
+              // 如果是函数则封装 action 高阶函数
+              if (typeof value === 'function') {
+                action = function(...agrs) {
+                  // 在执行原始函数之前开启允许修改开关
+                  globalState.allowStateChanges = true
+                  // 通过 apply 执行原始函数
+                  value.apply(this, agrs)
+                  // 执行完原始函数后又关闭开关
+                  globalState.allowStateChanges = false
+                }
+              }
+              // 判断如果是函数则使用封装的 action 高阶函数
+              this.value_ = typeof value === 'function' ? action : value,
+              this.observers_ = new Set()
+            }
+
+            get() {
+                // 在这里进行依赖收集
+                if (globalState.trackingDerivation) {
+                  this.observers_.add(globalState.trackingDerivation)
+                }
+                return this.value_
+            }
+
+            setNewVal(val) {
+              if (!globalState.allowStateChanges) {
+                console.warn('Since strict-mode is enabled, changing (observed) observable values without using an action is not allowed')
+              }
+              this.value_ = val
+              // 在这里进行依赖触发
+              this.observers_.forEach(derivation => derivation.schedule_())
+            }
+        }
+
+        function observable(target) {
+            const adm = new ObservableObjectAdministration(target)
+            target.__ob__ = adm
+            Object.keys(target).forEach(key => {
+                adm.defineObservableProperty_(key, target[key])
+            })
+            return target
+        }
+
+        function autorun(view) {
+          // 实例化订阅者中介
+          const reaction = new Reaction(
+              () => {
+                  // 回调函数中执行依赖收集函数
+                  reaction.track(view)
+              }
+          )
+          // 立即执行
+          reaction.schedule_()  
+        }
+
+        const mobxProxy = observable({ name: 'Cobyte', update(val) { this.name = val } })
+        // 设置订阅者
+        const subscriber = function() {
+          console.log(`我是：${mobxProxy.name}`)
+        }
+        
+        autorun(subscriber)
+
+        // 设置值触发依赖
+        mobxProxy.update('掘金签约作者')
+    </script>
+  <body>
+</html>
