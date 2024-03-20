@@ -92,7 +92,7 @@
         class ObservableValue {
             constructor(value) {
               // 通过 deepEnhancer 处理 value 值
-              this.value_ = deepEnhancer(value),
+              this.value_ = deepEnhancer(value)
               this.observers_ = new Set()
             }
 
