@@ -39,11 +39,15 @@ function createSandbox(value) {
 }
 
 const [count, setCount] = createSandbox(0)
-// 访问对象的值
-console.log('访问对象的值：', count())
-// 修改对象的值
+// 订阅者小明
+Listener = () => {
+    console.log(`计算结果是：${count()}`)
+}
+// 初始化
+Listener()
+Listener = null
+// 更改计算
 setCount(2)
-console.log('修改后的值', count())
     </script>
   <body>
 </html>
