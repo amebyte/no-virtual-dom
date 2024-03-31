@@ -6,22 +6,31 @@
   </head>
   <body>
     <script>
+let Listener
 // 创建沙箱环境
 function createSandbox(value) {
   // 创建一个与外部环境隔离的对象变量
-  const sandbox = {
-    value
+  const context = {
+    value,
+    observers: null
   }
-  // 创建一个外部环境可以访问 sandbox 对象的方法
+  // 创建一个外部环境可以访问 context 对象的方法
   function getter() {
-    return sandbox.value
+    if (Listener) {
+        if (!context.observers) {
+            context.observers = new Set([Listener])
+        } else {
+            context.observers.add(Listener)
+        }
+    }
+    return context.value
   }
-  // 创建一个外部环境可以访问 sandbox 对象的方法
+  // 创建一个外部环境可以访问 context 对象的方法
   function setter(val) {
-    sandbox.value = val
+    context.value = val
   }
 
-  // 暴露外部环境可以访问 sandbox 对象的方法
+  // 暴露外部环境可以访问 context 对象的方法
   return [getter, setter]
 }
 
