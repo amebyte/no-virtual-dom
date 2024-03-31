@@ -24,6 +24,13 @@ function createSandbox(value) {
   // 暴露外部环境可以访问 sandbox 对象的方法
   return [getter, setter]
 }
+
+const [count, setCount] = createSandbox(0)
+// 访问对象的值
+console.log('访问对象的值：', count())
+// 修改对象的值
+setCount(2)
+console.log('修改后的值', count())
     </script>
   <body>
 </html>
