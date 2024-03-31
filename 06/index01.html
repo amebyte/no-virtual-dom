@@ -28,6 +28,10 @@ function createSandbox(value) {
   // 创建一个外部环境可以访问 context 对象的方法
   function setter(val) {
     context.value = val
+    // 把存储订阅者的变量的订阅者全部通知一次
+    context.observers.forEach(fn => {
+       fn()
+    });
   }
 
   // 暴露外部环境可以访问 context 对象的方法
