@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>手写一个响应式状态库并应用在 React 上</title>
+  </head>
+  <body>
+    <script>
+let Listener
+// 创建沙箱环境
+function createSandbox(value) {
+  // 创建一个与外部环境隔离的对象变量
+  const context = {
+    value,
+    observers: null
+  }
+  // 创建一个外部环境可以访问 context 对象的方法
+  function getter() {
+    if (Listener) {
+        if (!context.observers) {
+            context.observers = new Set([Listener])
+        } else {
+            context.observers.add(Listener)
+        }
+    }
+    return context.value
+  }
+  // 创建一个外部环境可以访问 context 对象的方法
+  function setter(val) {
+    context.value = val
+    // 把存储订阅者的变量的订阅者全部通知一次
+    context.observers.forEach(fn => {
+       fn()
+    });
+  }
+
+  // 暴露外部环境可以访问 context 对象的方法
+  return [getter, setter]
+}
+
+function createEffect(fn) {
+  // 把需要观察的函数赋值到一个中间变量中去
+  Listener = fn
+  // 初始化
+  fn()
+  Listener = null
+}
+
+const [count, setCount] = createSandbox(0)
+createEffect(() => {
+  console.log(`计算结果是：${count()}`)
+})
+setCount(2)
+    </script>
+  <body>
+</html>
