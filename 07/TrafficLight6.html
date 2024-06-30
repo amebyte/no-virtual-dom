@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>使用状态模式和状态机进行红绿灯演示</title>
+  </head>
+  <body>
+    <div id="lightText"></div>
+    <script>
+// 公共基础类
+class TrafficLightState { 
+    count = null
+    timer = null
+    constructor(lightContext) {  
+        this.lightContext = lightContext;  
+    }  
+
+    setCount(initCount) {
+        if (this.count) {
+            this.count--
+        } else {
+            this.count = initCount
+        }
+    }
+
+    setState(state) {
+        this.lightContext.setState(state)
+    }
+
+    reset() {
+        this.timer = null
+        this.count = null
+    }
+
+    updateTextContent(text) {
+        this.lightContext.updateTextContent(text, this.count)
+    }
+  
+    // 声明每个状态可以响应的事件
+    onTick() {  
+        throw new Error(`该方法必须通过子类实现！`);  
+    }  
+}
+
+class RedLightState extends TrafficLightState {  
+    onTick() {  
+        // 假设红灯持续 x 秒  
+        this.setCount(this.lightContext.redDuration)
+        this.updateTextContent('红灯倒计时')
+        if (!this.timer) {
+            this.timer = setTimeout(() => { 
+                this.setState(new GreenLightState(this.lightContext))
+                this.reset()
+            }, this.lightContext.redDuration * 1000)
+        }
+    }  
+}  
+  
+class GreenLightState extends TrafficLightState {  
+    onTick() {   
+        // 假设绿灯持续 x 秒后变为黄灯  
+        this.setCount(this.lightContext.greenDuration)
+        this.updateTextContent('绿灯倒计时')
+        if (!this.timer) {
+            this.timer = setTimeout(() => { 
+                this.setState(new YellowLightState(this.lightContext))
+                this.reset()
+            }, this.lightContext.greenDuration * 1000)
+        }
+    }  
+}  
+  
+class YellowLightState extends TrafficLightState {  
+    onTick() {   
+        // 假设黄灯持续 x 秒后变为红灯  
+        this.setCount(this.lightContext.yellowDuration)
+        this.updateTextContent('黄灯倒计时')
+        if (!this.timer) {
+            this.timer = setTimeout(() => { 
+                this.setState(new RedLightState(this.lightContext))
+                this.reset()
+            }, this.lightContext.yellowDuration * 1000)
+        } 
+    }  
+}  
+
+
+class TrafficLight {
+    constructor(el, redDuration, greenDuration, yellowDuration) {
+        this.el = el
+        this.redDuration = redDuration  
+        this.greenDuration = greenDuration
+        this.yellowDuration = yellowDuration
+        this.state = new RedLightState(this); // 初始状态为红灯  
+        // 启动红绿灯循环  
+        this.tick();  
+    }
+
+    setState(state) {
+        this.state = state
+    }
+
+    updateTextContent(text, count) {
+        this.el.textContent = `${text}：${count}`
+    }
+
+    tick() {
+        this.state.onTick()
+        setTimeout(() => this.tick(), 1000)
+    }
+
+}
+
+const el = document.getElementById('lightText')
+// 启动红绿灯状态切换
+new TrafficLight(el, 5, 3, 2)
+
+    </script>
+  <body>
+</html>
