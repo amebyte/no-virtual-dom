@@ -1,0 +1,46 @@
+<!DOCTYPE html>  
+<html lang="en">  
+<head>  
+<meta charset="UTF-8">  
+<title>Simple Router</title>  
+</head>  
+<body>  
+<ul>  
+    <li><a href="#/about">关于我</a></li>  
+    <li><a href="#/contact">联系我</a></li>  
+</ul>  
+  
+<!-- 渲染路由对应的 UI -->  
+<div id="routeView"></div>  
+  
+<script>  
+  
+// Router 类  
+class Router {  
+    constructor(viewId) {  
+        this.routerView = document.getElementById(viewId)  
+  
+        // 监听哈希值变化事件  
+        window.addEventListener('hashchange', this.updateView.bind(this)) 
+        // 监听DOM加载完成事件
+        window.addEventListener('DOMContentLoaded', this.updateView.bind(this))  
+    }  
+  
+    // 更新视图的方法  
+    updateView() {  
+        // 获取当前 hash 值并去掉 # 符号  
+        const currPath = window.location.hash.slice(1)  
+        if (currPath === '/about') {
+            this.routerView.textContent = '我是掘金签约作者'
+        } else if (currPath === '/contact') {
+            this.routerView.textContent = '我的微信号是：iamcobyte'
+        }
+    }  
+}  
+  
+// 创建 Router 实例并传入视图元素的 ID  
+new Router('routeView')
+  
+</script>  
+</body>  
+</html>
