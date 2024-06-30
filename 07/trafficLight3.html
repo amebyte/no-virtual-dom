@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>使用状态模式和状态机进行红绿灯演示</title>
+  </head>
+  <body>
+    <div id="lightText"></div>
+    <script>
+
+class TrafficLight {
+    state = 'red'
+    count = null
+    timer = null
+    el = null
+    constructor(el) {
+        this.el = el
+        this.onTick()
+        setInterval(() => this.onTick(), 1000)
+    }
+
+    onTick() {
+       if (this.state === 'red') {  
+            if (this.count) {
+                this.count--
+            } else {
+                // 假设绿灯持续 5 秒 
+                this.count = 5
+            }
+            this.el.textContent = `红灯倒计时：${this.count}`
+            if (!this.timer) {
+                this.timer = setTimeout(() => { 
+                    this.state = 'green'
+                    this.timer = null
+                    this.count = null
+                }, 5000)
+            }
+        } else if (this.state === 'green') {  
+            if (this.count) {
+                this.count--
+            } else {
+                // 假设绿灯持续 3 秒 
+                this.count = 3
+            }
+            this.el.textContent = `绿灯倒计时：${this.count}`
+            if (!this.timer) {
+                this.timer = setTimeout(() => {
+                    this.state = 'yellow'  
+                    this.timer = null
+                    this.count = null
+                }, 3000)
+            }
+        } else if (this.state === 'yellow') {  
+            if (this.count) {
+                this.count--
+            } else {
+                // 假设黄灯持续 5 秒 
+                this.count = 2
+            }
+            this.el.textContent = `黄灯倒计时：${this.count}`
+            if (!this.timer) {
+                this.timer = setTimeout(() => {
+                    this.state = 'red'  
+                    this.timer = null
+                    this.count = null
+                }, 2000)
+            }
+        }  
+    }
+}
+
+const el = document.getElementById('lightText')
+
+// 启动红绿灯状态切换
+new TrafficLight(el)
+    </script>
+  <body>
+</html>
