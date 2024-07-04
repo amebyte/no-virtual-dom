@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>使用 JavaScript 实现状态机的经典问题</title>
+  </head>
+  <body>
+    <div id="lightText"></div>
+    <script>
+
+      const State = {
+        'S1': 1,
+        'S2': 2,
+        'S3': 3,
+        'S4': 4
+      }
+
+      class StateMachine {
+        state = State.S1
+        // 缓冲区内容
+        buffer = ''
+        // 正在查看的缓冲区内的索引
+        index = 0
+        output = []
+        constructor() {
+
+        }
+        parse(input) {
+            this.buffer = input
+            console.log('lll', this.buffer.length)
+            while (this.index < this.buffer.length) {
+                const c = this.buffer[this.index]
+                console.log('ccc', c)
+                switch(this.state) {
+                    case State.S1: {
+                        console.log('c', c, c==='1')
+                        if (c === '1') {
+                            this.output.push('0')
+                            this.state = State.S2
+                        }
+                        break
+                    }
+                    case State.S2: {
+                        if (c === '0') {
+                            this.output.push('0')
+                            this.state = State.S3
+                        }
+                        break
+                    }
+                    case State.S3: {
+                        if (c === '1') {
+                            this.output.push('0')
+                            this.state = State.S4
+                        }
+                    }
+                    case State.S4: {
+                        if (c === '1') {
+                            this.output.push('1')
+                        }
+                    }                
+                }
+                this.index++
+            }
+        }
+      }
+
+      const stateMachine = new StateMachine()
+      stateMachine.parse('1011')
+      console.log(stateMachine.output.join(''), stateMachine.output, 'dd')
+    </script>
+  <body>
+</html>
