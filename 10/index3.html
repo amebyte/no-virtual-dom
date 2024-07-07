@@ -37,6 +37,10 @@
                           // 在 S1 状态下，如果输入是 '1'，则输出 '0'，并将状态切换到 S2
                           this.output.push('0')
                           this.state = State.S2
+                        } else if (c === '0') {
+                          // 在 S1 状态下，如果输入是 '0'，则输出 '0'，并将状态切换到 S1
+                          this.output.push('0')
+                          this.state = State.S1
                         }
                         break
                     }
@@ -45,6 +49,10 @@
                           // 在 S2 状态下，如果输入是 '0'，则输出 '0'，并将状态切换到 S3
                           this.output.push('0')
                           this.state = State.S3
+                        } else if (c === '1') {
+                          // 在 S2 状态下，如果输入是 '1'，则输出 '0'，并将状态切换到 S2
+                          this.output.push('0')
+                          this.state = State.S2
                         }
                         break
                     }
@@ -53,6 +61,10 @@
                           // 在 S3 状态下，如果输入是 '1'，则输出 '0'，并将状态切换到 S4
                           this.output.push('0')
                           this.state = State.S4
+                        } else if (c === '0') {
+                          // 在 S3 状态下，如果输入是 '0'，则输出 '0'，并将状态切换到 S1
+                          this.output.push('0')
+                          this.state = State.S1
                         }
                         break
                     }
@@ -61,6 +73,10 @@
                           // 在 S4 状态下，如果输入是 '1'，则输出 '1'，并将状态切换到 S2
                           this.output.push('1')
                           this.state = State.S2
+                        } else if (c === '0') {
+                          // 在 S4 状态下，如果输入是 '0'，则输出 '0'，并将状态切换到 S3
+                          this.output.push('0')
+                          this.state = State.S3
                         }
                         break
                     }                
@@ -72,7 +88,7 @@
       // 实例化状态机
       const stateMachine = new StateMachine()
       // 输入特定序列
-      stateMachine.parse('1011')
+      stateMachine.parse('11110111101111010001010010110100001011011111101011001001010010010111')
       // 输出
       console.log(stateMachine.output.join(''))
     </script>
