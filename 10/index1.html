@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>使用 JavaScript 实现状态机的经典问题</title>
+  </head>
+  <body>
+    <script>
+
+        // 定义状态
+        const State = {
+            'S1': 1,
+            'S2': 2,
+            'S3': 3,
+            'S4': 4
+        }
+        // 用于追踪当前的状态，初始状态被设置为 S1
+        let state = State.S1
+        // 用于存储状态机在处理输入序列时产生的输出
+        const output = []
+        // parse 函数接收一个字符 c 作为输入，并根据当前状态和输入字符来决定下一步的状态和输出
+        function parse(c) {
+            switch(state) {
+                case State.S1: {
+                    if (c === '1') {
+                        // 在 S1 状态下，如果输入是 '1'，则输出 '0'，并将状态切换到 S2
+                        output.push('0')
+                        state = State.S2
+                    }
+                    break
+                }
+                case State.S2: {
+                    if (c === '0') {
+                        // 在 S2 状态下，如果输入是 '0'，则输出 '0'，并将状态切换到 S3
+                        output.push('0')
+                        state = State.S3
+                    }
+                    break
+                }
+                case State.S3: {
+                    if (c === '1') {
+                        // 在 S3 状态下，如果输入是 '1'，则输出 '0'，并将状态切换到 S4
+                        output.push('0')
+                        state = State.S4
+                    }
+                    break
+                }
+                case State.S4: {
+                    if (c === '1') {
+                        // 在 S4 状态下，如果输入是 '1'，则输出 '1'，并将状态切换到 S2
+                        output.push('1')
+                        state = State.S2
+                    }
+                    break
+                }                
+            }
+        }
+        // 输入序列
+        const input = '1011'
+        
+        for (let i = 0; i < input.length; i ++) {
+            // 输入序列 '1011' 被逐个字符地传递给 parse 函数进行处理
+            parse(input[i])
+        }
+        // 输出结果
+        console.log('输出：', output.join(''))
+      
+    </script>
+  <body>
+</html>
