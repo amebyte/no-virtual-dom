@@ -121,56 +121,63 @@ function ref(value) {
 
 
 let activeScopeEffect
+
+class EffectScope {
+    effects = []
+    constructor() {
+
+    }
+    run(fn) {
+        try {
+            this.on()
+            fn()
+        } finally {
+            this.off()
+        }
+    }
+    on() {
+        activeScopeEffect = this
+    }
+    off() {
+        activeScopeEffect = this
+    }
+    stop() {
+        this.effects.forEach(e => e.stop())
+    }
+}
+
 function recordEffectScope(effect) {
     if (activeScopeEffect) {
         activeScopeEffect.effects.push(effect)
     }
 }
 
-function effectScope(fn) {
-    function scopeFn () {
-        activeScopeEffect = scopeFn
-        fn()
-        activeScopeEffect = null
-    }
-    scopeFn.effects = []
-    scopeFn.stop = function() {
-        scopeFn.effects.forEach(effect => effect.stop())
-    }
-    return scopeFn
+function effectScope() {
+    return new EffectScope()
 }
 
 const count1 = ref(0)
 const count2 = ref(0)
 const count3 = ref(0)
 const count4 = ref(0)
-const scope1 = effectScope(() => {
-    effect(() => {
-        console.log(`effect1：${count1.value}`)
-    })
-
-    effect(() => {
-        console.log(`effect2：${count2.value}`)
-    })
-})
-scope1()
-
-const scope2 = effectScope(() => {
-    effect(() => {
-        console.log(`effect3：${count3.value}`)
-    })
-
-    effect(() => {
-        console.log(`effect4：${count4.value}`)
-    })
+const scope1 = effectScope()
+// activeScopeEffect = scope1
+scope1.on()
+effect(() => {
+    console.log(`effect1：${count1.value}`)
 })
 
-scope2()
+effect(() => {
+    console.log(`effect2：${count2.value}`)
+})
+// activeScopeEffect = null
+scope1.off()
+
 
 setInterval(() => {
     console.log('=====')
     if (count1.value === 3) {
-        scope2.stop()
+        scope1.stop()
     }
     count1.value++
     count2.value++

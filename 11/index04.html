@@ -127,24 +127,27 @@ function recordEffectScope(effect) {
     }
 }
 
-function effectScope(fn) {
-    function scopeFn () {
-        activeScopeEffect = scopeFn
-        fn()
-        activeScopeEffect = null
+function effectScope() {
+    const scope = {
+        effects: [],
+        run(fn) {
+            activeScopeEffect = scope
+            fn()
+            activeScopeEffect = null
+        },
+        stop() {
+            scope.effects.forEach(e => e.stop())
+        }
     }
-    scopeFn.effects = []
-    scopeFn.stop = function() {
-        scopeFn.effects.forEach(effect => effect.stop())
-    }
-    return scopeFn
+    return scope
 }
 
 const count1 = ref(0)
 const count2 = ref(0)
 const count3 = ref(0)
 const count4 = ref(0)
-const scope1 = effectScope(() => {
+const scope1 = effectScope()
+scope1.run(() => {
     effect(() => {
         console.log(`effect1：${count1.value}`)
     })
@@ -153,9 +156,9 @@ const scope1 = effectScope(() => {
         console.log(`effect2：${count2.value}`)
     })
 })
-scope1()
 
-const scope2 = effectScope(() => {
+const scope2 = effectScope()
+scope2.run(() => {
     effect(() => {
         console.log(`effect3：${count3.value}`)
     })
@@ -164,8 +167,6 @@ const scope2 = effectScope(() => {
         console.log(`effect4：${count4.value}`)
     })
 })
-
-scope2()
 
 setInterval(() => {
     console.log('=====')
