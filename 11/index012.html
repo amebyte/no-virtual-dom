@@ -124,8 +124,9 @@ const delEl = document.getElementById('delete')
 // 利用响应式创建数据
 const count = ref(0)
 // 利用响应式动态变更 DOM 内容
-effect(() => {
+const runner = effect(() => {
     counterEl.textContent = count.value
+    console.log('动态变更 DOM 内容', count.value)
 })
 // 添加
 addEl.addEventListener('click', () => {
@@ -133,6 +134,7 @@ addEl.addEventListener('click', () => {
 })
 // 清除计算结果
 delEl.addEventListener('click', () => {
+    runner.effect.stop()
     const parent = counterEl.parentNode
     parent.removeChild(counterEl)
 })

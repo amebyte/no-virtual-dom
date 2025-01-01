@@ -126,6 +126,7 @@ const count = ref(0)
 // 利用响应式动态变更 DOM 内容
 effect(() => {
     counterEl.textContent = count.value
+    console.log('动态变更 DOM 内容', count.value)
 })
 // 添加
 addEl.addEventListener('click', () => {
