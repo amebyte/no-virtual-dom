@@ -137,27 +137,34 @@ delEl.addEventListener('click', () => {
     parent.removeChild(counterEl)
 })
 
-// const count1 = ref(0)
-// const count2 = ref(0)
-// const effectStacks = []
-// const effect1 = effect(() => {
-//     console.log(`effect1：${count1.value}`)
-// })
-// effectStacks.push(effect1)
-// const effect2 = effect(() => {
-//     console.log(`effect2：${count2.value}`)
-// })
-// effectStacks.push(effect2)
+const count1 = ref(0)
+const count2 = ref(0)
+// 用于存储这些副作用对象，以便后续可以停止它们
+const effectStacks = []
+// 观察响应式变量 count1 的变化情况
+const effect1 = effect(() => {
+    console.log(`effect1：${count1.value}`)
+})
+// 手动收集副作用
+effectStacks.push(effect1)
+// 观察响应式变量 count2 的变化情况
+const effect2 = effect(() => {
+    console.log(`effect2：${count2.value}`)
+})
+// 手动收集副作用
+effectStacks.push(effect2)
 
-// const t = setInterval(() => {
-//     if (count1.value === 2) {
-//         effectStacks.forEach(effect => effect.effect.stop())
-//         clearInterval(t)
-//     } else {
-//         count1.value++
-//         count2.value++
-//     }
-// }, 1000)
+// 通过设置定时器每一秒让 count1 和 count2 自动增加 1
+const t = setInterval(() => {
+    if (count1.value === 2) {
+        // 如果等于 2，则遍历 effectStacks 数组，调用每个副作用对象的 stop 方法来停止它们。
+        effectStacks.forEach(effect => effect.effect.stop())
+        clearInterval(t)
+    } else {
+        count1.value++
+        count2.value++
+    }
+}, 1000)
 
 
 </script>
