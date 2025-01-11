@@ -10,7 +10,9 @@ class ReactiveEffect {
     deps = []
     constructor(fn) {
         this._fn = fn
-        recordEffectScope(this)
+        if (activeEffectScope) {
+            activeEffectScope.effects.push(this)
+        }
     }
     run () {
         // 根据 Vue2 的数据响应式原理，我们知道在执行具体订阅者函数之前需要把当前订阅者赋值给一个中间变量。
@@ -118,33 +120,41 @@ function ref(value) {
     return new RefImpl(value)
 }
 
-
-
+// 记录当前激活的作用域对象
 let activeEffectScope
-function recordEffectScope(effect) {
-    if (activeEffectScope) {
-        activeEffectScope.effects.push(effect)
-    }
-}
+class EffectScope {
+    // 响应式副作用对象存储中心
+    effects = []
+    constructor() {
 
-function effectScope(fn) {
-    function scopeFn () {
-        activeEffectScope = scopeFn
+    }
+    // 订阅，也就是收集响应式副作用对象
+    sub(fn) {
+        activeEffectScope = this
         fn()
         activeEffectScope = null
     }
-    scopeFn.effects = []
-    scopeFn.stop = function() {
-        scopeFn.effects.forEach(effect => effect.stop())
+    // 通知，也就是停止收集到的响应式副作用对象
+    notify() {
+        this.effects.forEach(e => e.stop())
     }
-    return scopeFn
 }
+
+const scope1 = new EffectScope()
+const scope2 = new EffectScope()
+
+
+// let activeEffectScope
+// function recordEffectScope(effect) {
+//     if (activeEffectScope) {
+//         activeEffectScope.effects.push(effect)
+//     }
+// }
 
 const count1 = ref(0)
 const count2 = ref(0)
-const count3 = ref(0)
-const count4 = ref(0)
-const scope1 = effectScope(() => {
+
+scope1.sub(() => {
     effect(() => {
         console.log(`effect1：${count1.value}`)
     })
@@ -153,31 +163,15 @@ const scope1 = effectScope(() => {
         console.log(`effect2：${count2.value}`)
     })
 })
-scope1()
-
-const scope2 = effectScope(() => {
-    effect(() => {
-        console.log(`effect3：${count3.value}`)
-    })
-
-    effect(() => {
-        console.log(`effect4：${count4.value}`)
-    })
-})
-
-scope2()
 
 setInterval(() => {
     console.log('=====')
-    if (count1.value === 3) {
-        scope2.stop()
+    if (count1.value === 2) {
+        scope1.notify()
     }
     count1.value++
     count2.value++
-    count3.value++
-    count4.value++
 }, 1000)
-
 
 </script>
   <body>
