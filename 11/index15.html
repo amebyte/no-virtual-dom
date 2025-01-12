@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>从发布订阅模式的角度理解 Vue 的数据响应式原理</title>
+  </head>
+  <body>
+    <script>
+class ReactiveEffect {
+    deps = []
+    constructor(fn) {
+        this._fn = fn
+        recordEffectScope(this)
+    }
+    run () {
+        // 根据 Vue2 的数据响应式原理，我们知道在执行具体订阅者函数之前需要把当前订阅者赋值给一个中间变量。
+        activeEffect = this
+        this._fn()
+        // 确保只在副作用函数中读取响应式变量才进行依赖收集
+        activeEffect = null
+    }
+    stop () {
+      this.deps.forEach(dep => dep.delete(this))
+    }
+} 
+// 订阅者存储中心
+const targetMap  = new WeakMap()
+  // 添加订阅者
+function track(target, key) {
+    let depsMap = targetMap.get(target)
+    if (!depsMap) {
+        depsMap = new Map()
+        targetMap.set(target, depsMap)
+    }
+    let dep = depsMap.get(key)
+    if (!dep) {
+      dep = new Set()
+      depsMap.set(key, dep)
+    }
+    if (activeEffect) {
+        trackEffect(dep)
+    }
+}
+
+function trackEffect(dep) {
+    if (dep.has(activeEffect)) {
+        return
+    }
+    dep.add(activeEffect)
+    activeEffect.deps.push(dep)
+}
+
+  // 通知订阅者
+function trigger(target, key) {
+    const depsMap = targetMap.get(target)
+    if (!depsMap) return
+    const deps = depsMap.get(key)
+    triggerEffect(deps)
+}
+
+function triggerEffect(deps) {
+    if(deps) {
+        deps.forEach(effect => effect.run());
+    }
+}
+
+let activeEffect
+// reactive
+function reactive(data) {
+    return new Proxy(data, {
+        get(target, key) {
+            // 存在依赖就把依赖收集到依赖存储中心
+            track(target, key)
+            return Reflect.get(target, key) 
+        },
+        set(target, key, val) {
+            const result = Reflect.set(target, key, val)
+            // 值更新了，就需要去把依赖存储中心中的依赖全部重新执行一遍
+            trigger(target, key)
+            return result
+        }
+    })
+}
+
+function effect(fn) {
+    const _effect = new ReactiveEffect(fn)
+    _effect.run()
+    const runner = _effect.run.bind(_effect)
+    runner.effect = _effect
+    return runner 
+}
+
+// 判断是否是对象
+function isObject(obj) {
+    return obj !== null && typeof obj === 'object'
+}
+
+class RefImpl {
+    _value
+    dep = new Set()
+    constructor(value) {
+        // 如果传进来的是对象那么最终还是通过 reactive API 实现数据响应式
+        this._value = isObject(value) ? reactive(value) : value
+    }
+    get value() {
+       // 存在依赖就把依赖收集到依赖存储中心
+       if (activeEffect) trackEffect(this.dep)
+       return this._value 
+    }
+    set value(val) {
+        this._value = val
+        // 更新文章的时候通知所有的订阅者
+        triggerEffect(this.dep)
+    }
+}
+
+function ref(value) {
+    return new RefImpl(value)
+}
+
+// 记录当前激活的作用域对象
+let activeEffectScope
+class EffectScope {
+    // 响应式副作用对象存储中心
+    effects = []
+    constructor() {
+        recordEffectScope(this)
+    }
+    // 订阅，也就是收集响应式副作用对象
+    run(fn) {
+        activeEffectScope = this
+        fn()
+        activeEffectScope = null
+    }
+    // 通知，也就是停止收集到的响应式副作用对象
+    stop() {
+        this.effects.forEach(e => e.stop())
+    }
+}
+
+// 创建作用域的工厂函数
+function effectScope() {
+    return new EffectScope()
+}
+
+
+// let activeEffectScope
+function recordEffectScope(effect) {
+    if (activeEffectScope) {
+        activeEffectScope.effects.push(effect)
+    }
+}
+
+const count1 = ref(0)
+const count2 = ref(0)
+const count3 = ref(0)
+const count4 = ref(0)
+const scope1 = effectScope()
+scope1.run(() => {
+    effect(() => {
+        console.log(`effect1：${count1.value}`)
+    })
+
+    effect(() => {
+        console.log(`effect2：${count2.value}`)
+    })
+    const scope2 = effectScope()
+    scope2.run(() => {
+        effect(() => {
+            console.log(`effect3：${count4.value}`)
+        })
+
+        effect(() => {
+            console.log(`effect4：${count4.value}`)
+        })
+    })
+})
+
+
+
+setInterval(() => {
+    console.log('=====')
+    if (count1.value === 1) {
+        scope1.stop()
+    }
+    count1.value++
+    count2.value++
+    count3.value++
+    count4.value++
+}, 1000)
+
+</script>
+  <body>
+</html>
