@@ -6,17 +6,36 @@
   </head>
   <body>
     <script>
+// 用于管理嵌套 effect 的调用栈
+const effectStack = []
 class ReactiveEffect {
+    // 存储所有包含本 effect 的依赖集合（Set）
+    // 用于实现 stop 功能时快速清理依赖
     deps = []
     constructor(fn) {
+        // 包装的副作用函数（开发者传入的原始函数）
         this._fn = fn
     }
+    // 执行副作用函数，并触发依赖收集
     run () {
-        // 根据 Vue2 的数据响应式原理，我们知道在执行具体订阅者函数之前需要把当前订阅者赋值给一个中间变量。
-        activeEffect = this
-        this._fn()
+        // 这里为什么要用try...finally呢？比如如果_fn中有错误，finally块仍然会执行，保证栈的平衡。
+        try {
+            // 1. 设置当前激活的 effect 为自身
+            activeEffect = this;
+            // 2. 压入 effect 调用栈（处理嵌套 effect 的关键）
+            effectStack.push(this);
+            // 3. 执行原始函数，触发响应式属性的 getter，进行依赖收集
+            return this._fn(); // 返回函数执行结果（支持 computed 等场景）
+        } finally {
+            // 4. 无论执行是否抛出异常，确保以下清理逻辑一定执行
+            effectStack.pop(); // 当前 effect 出栈
+            // 5. 恢复 activeEffect 为上一个 effect（栈顶元素）或 undefined
+            activeEffect = effectStack.length > 0 ? effectStack[effectStack.length - 1] : undefined;
+        }
     }
+    // 停止当前 effect 的响应式追踪
     stop () {
+      // 遍历所有关联的依赖集合，从中删除本 effect
       this.deps.forEach(dep => dep.delete(this))
     }
 } 
@@ -32,10 +51,6 @@ function track(target, key) {
     let deps = depsMap.get(key)
     if (!deps) {
       deps = new Set()
-      // 标记依赖在 上一轮执行周期 中是否被追踪
-      deps.wasTracked = 0
-      // 标记依赖在 当前执行周期 中是否被追踪
-      deps.newTracked = 0
       depsMap.set(key, deps)
     }
     if (activeEffect) {
@@ -77,18 +92,16 @@ function effect(fn) {
     return runner 
 }
 
-const proxy = reactive({ author: 'Cobyte', date: '2024-03-05' })
+window.state = reactive({ parent: 'parent', child: 'child' })
 
-const runner = effect(() => {
-  console.log(`我是：${proxy.author}`)
+effect(() => {
+    effect(() => {
+        console.log(`我是子组件：${state.child}`)
+    })
+  console.log(`我是父组件：${state.parent}`)
 })
-proxy.author = 'Coboy'
-// 取消订阅，也就是取消依赖追踪
-runner.effect.stop()
-proxy.author = '掘金签约作者'
-// 恢复依赖追踪
-runner()
-proxy.author = '恢复依赖追踪了' 
+
+
 
 </script>
   <body>

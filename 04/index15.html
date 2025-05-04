@@ -6,6 +6,7 @@
   </head>
   <body>
     <script>
+const effectStack = [];
 class ReactiveEffect {
     deps = []
     constructor(fn) {
@@ -14,7 +15,11 @@ class ReactiveEffect {
     run () {
         // 根据 Vue2 的数据响应式原理，我们知道在执行具体订阅者函数之前需要把当前订阅者赋值给一个中间变量。
         activeEffect = this
+        effectStack.push(this)
         this._fn()
+        // activeEffect = null
+        effectStack.pop()
+        activeEffect = effectStack[effectStack.length - 1]
     }
     stop () {
       this.deps.forEach(dep => dep.delete(this))
@@ -32,13 +37,15 @@ function track(target, key) {
     let deps = depsMap.get(key)
     if (!deps) {
       deps = new Set()
-      // 标记依赖在 上一轮执行周期 中是否被追踪
-      deps.wasTracked = 0
-      // 标记依赖在 当前执行周期 中是否被追踪
-      deps.newTracked = 0
+    //   // 标记依赖在 上一轮执行周期 中是否被追踪
+    //   deps.wasTracked = 0
+    //   // 标记依赖在 当前执行周期 中是否被追踪
+    //   deps.newTracked = 0
       depsMap.set(key, deps)
     }
-    if (activeEffect) {
+    console.log('has', deps.has(activeEffect));
+    if (activeEffect && !deps.has(activeEffect)) {
+        console.log('activeEffect', activeEffect);
         deps.add(activeEffect)
         activeEffect.deps.push(deps)
     }
@@ -77,18 +84,23 @@ function effect(fn) {
     return runner 
 }
 
-const proxy = reactive({ author: 'Cobyte', date: '2024-03-05' })
+window.obj = reactive({ author: 'Cobyte', date: '2024-03-05' })
 
-const runner = effect(() => {
-  console.log(`我是：${proxy.author}`)
+let update = null
+
+effect(() => {
+    // 不存在 update 函数则初始化
+    if (!update) {
+        update = effect(() => {
+            console.log(`我是子组件：${obj.date}`);
+        })
+    } else {
+        // 存在 update 函数则执行更新
+        update() 
+    }
+  console.log(`我是父组件：${obj.author}`)
 })
-proxy.author = 'Coboy'
-// 取消订阅，也就是取消依赖追踪
-runner.effect.stop()
-proxy.author = '掘金签约作者'
-// 恢复依赖追踪
-runner()
-proxy.author = '恢复依赖追踪了' 
+
 
 </script>
   <body>
