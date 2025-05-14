@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>从发布订阅模式的角度理解 Vue 的数据响应式原理</title>
+  </head>
+  <body>
+    <script>
+// 用于管理嵌套 effect 的调用栈
+const effectStack = []
+let effectTrackDepth = 0
+const maxMarkerBits = 30
+class ReactiveEffect {
+    // 存储所有包含本 effect 的依赖集合（Set）
+    // 用于实现 stop 功能时快速清理依赖
+    deps = []
+    constructor(fn, scheduler) {
+        // 包装的副作用函数（开发者传入的原始函数）
+        this._fn = fn
+        this.scheduler = scheduler
+    }
+    // 执行副作用函数，并触发依赖收集
+    run () {
+        // 这里为什么要用try...finally呢？比如如果_fn中有错误，finally块仍然会执行，保证栈的平衡。
+        try {
+            // 1. 设置当前激活的 effect 为自身
+            activeEffect = this;
+            // 2. 压入 effect 调用栈（处理嵌套 effect 的关键）
+            effectStack.push(this);
+            // 
+            effectTrackDepth++;
+            if (effectTrackDepth <= maxMarkerBits) {
+                this.initDepMarkers()
+            } else {
+                // 当递归深度超过30层时，回退到完全清理模式
+                this.cleanup()
+            }
+            // 初始化标记
+            this.initDepMarkers();
+            // 3. 执行原始函数，触发响应式属性的 getter，进行依赖收集
+            return this._fn(); // 返回函数执行结果（支持 computed 等场景）
+        } finally {
+            if (effectTrackDepth <= maxMarkerBits) {
+                this.finalizeDepMarkers()
+            }
+            effectTrackDepth--;
+            // 4. 无论执行是否抛出异常，确保以下清理逻辑一定执行
+            effectStack.pop(); // 当前 effect 出栈
+            // 5. 恢复 activeEffect 为上一个 effect（栈顶元素）或 undefined
+            activeEffect = effectStack.length > 0 ? effectStack[effectStack.length - 1] : undefined;
+        }
+    }
+    // 停止当前 effect 的响应式追踪
+    stop () {
+      // 遍历所有关联的依赖集合，从中删除本 effect
+      this.deps.forEach(dep => dep.delete(this))
+    }
+    // 初始化依赖的追踪状态标记
+    initDepMarkers() {
+        const { deps } = this
+        if (deps.length) {
+            for (let i = 0; i < deps.length; i++) {
+                // 若某个依赖在 上一轮执行 中被追踪过，其对应的位会被标记到 wasTracked 中
+                deps[i].wasTracked = deps[i].wasTracked | 1 << effectTrackDepth
+            }
+        }
+    }
+    // 清理无效依赖 并 优化依赖集合
+     finalizeDepMarkers() {
+        const { deps } = this
+        if (deps.length) {
+            for (let i = 0; i < deps.length; i++) {
+                const dep = deps[i]
+                // 根据依赖的跟踪状态，清理不再需要的依赖
+                if (wasTracked(dep) && !newTracked(dep)) {
+                    // 移除当前 effect 对该 dep 的依赖
+                    dep.delete(this)
+                }
+                // 清除该层级对应的位掩码
+                const trackOpBit = 1 << effectTrackDepth
+                dep.wasTracked = dep.wasTracked & ~trackOpBit
+                dep.newTracked = dep.newTracked & ~trackOpBit
+            }
+        }
+    }
+    // 完全清理模式
+    cleanup() {
+        const { deps } = this
+        if (deps.length) {
+            for (let i = 0; i < deps.length; i++) {
+                deps[i].delete(this)
+            }
+            deps.length = 0
+        }
+    }
+} 
+
+// 订阅者存储中心
+const targetMap  = new WeakMap()
+  // 添加订阅者
+function track(target, key) {
+    let depsMap = targetMap.get(target)
+    if (!depsMap) {
+        depsMap = new Map()
+        targetMap.set(target, depsMap)
+    }
+    let deps = depsMap.get(key)
+    if (!deps) {
+      deps = new Set()
+      // 标记依赖在 上一轮执行周期 中是否被追踪
+      deps.wasTracked = 0
+      // 标记依赖在 当前执行周期 中是否被追踪
+      deps.newTracked = 0
+      depsMap.set(key, deps)
+    }
+    trackEffects(deps)
+}
+
+function trackEffects(dep) {
+    let shouldTrack = false
+    if (!newTracked(dep)) {
+      setNewTracked(dep)
+      shouldTrack = !wasTracked(dep)
+    }
+
+    if (shouldTrack  && activeEffect) {
+        dep.add(activeEffect)
+        activeEffect.deps.push(dep)
+    }
+}
+  // 通知订阅者
+function trigger(target, key) {
+    const depsMap = targetMap.get(target)
+    if (!depsMap) return
+    const effects = depsMap.get(key)
+    effects && effects.forEach(dep => {
+        if (dep.scheduler) {
+            dep.scheduler()
+        } else {
+            dep.run()
+        }
+    })
+}
+
+let activeEffect
+// reactive
+function reactive(data) {
+    return new Proxy(data, {
+        get(target, key) {
+            // 存在依赖就把依赖收集到依赖存储中心
+            track(target, key)
+            return Reflect.get(target, key) 
+        },
+        set(target, key, val) {
+            const result = Reflect.set(target, key, val)
+            // 值更新了，就需要去把依赖存储中心中的依赖全部重新执行一遍
+            trigger(target, key)
+            return result
+        }
+    })
+}
+
+function effect(fn, scheduler) {
+    const _effect = new ReactiveEffect(fn, scheduler)
+    _effect.run()
+    const runner = _effect.run.bind(_effect)
+    runner.effect = _effect
+    return runner 
+}
+
+function newTracked(dep) {
+  return (dep.newTracked & (1 << effectTrackDepth)) !== 0;
+}
+
+function setNewTracked(dep) {
+  dep.newTracked |= (1 << effectTrackDepth); // 按位或操作
+}
+
+function wasTracked(dep) {
+  return (dep.wasTracked & (1 << effectTrackDepth)) !== 0;
+}
+
+class ComputedRefImpl {
+    _value
+    _dirty = true
+    constructor(getter) {
+        // this.effect = new ReactiveEffect(getter)
+       this.effect = new ReactiveEffect(getter, () => {
+           if (!this._dirty) {
+               this._dirty = true
+           }
+       }) 
+    }
+
+    get value() {
+        if (this._dirty) {
+            this._dirty = false
+            this._value = this.effect.run()
+        }
+        return this._value
+    }
+}
+
+function computed(getter) {
+    return new ComputedRefImpl(getter)
+}
+
+// function computed(getter) {
+//     return {
+//         get value() {
+//             return getter()
+//         }
+//     }
+// }
+
+const state = reactive({ count: 0 })
+const computedState = computed(() => state.count + 1)
+console.log(computedState.value)
+state.count++
+console.log(computedState.value)
+console.log(computedState.value)
+console.log(computedState.value)
+
+</script>
+  <body>
+</html>
