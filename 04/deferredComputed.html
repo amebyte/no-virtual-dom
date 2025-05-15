@@ -267,16 +267,70 @@ function computed(getter) {
 // state.count++
 // state.count++
 
-const state = reactive({ count: 0 })
-const computedState = computed(() => state.count + 1)
-effect(() => {
-  console.log('观察计算属性', computedState.value)
+// const state = reactive({ count: 0 })
+// 每个组件都有一个 render 函数，通过执行 render 函数可以生成虚拟DOM，用于渲染组件
+
+const App = {
+    setup() {
+      const state = reactive({ count: 0 })
+      return {
+        state
+      }
+    },
+    render(ctx) {
+        console.log('count:', ctx.state.count) 
+    }
+}
+
+// 模拟组件实例
+const instance = {
+  effect: null,
+  update: null,
+  render: null,
+  setupState: null,
+  isMounted: false, // 组件是否已经挂载
+} 
+
+// 初始化组件实例
+instance.setupState = App.setup()
+instance.render = App.render
+
+// 初始化组件实例
+
+// 组件渲染副作用函数
+const componentUpdateFn = () => {
+    if (!instance.isMounted) {
+        // 模拟组件初始化
+        instance.isMounted = true
+        console.log('挂载组件')
+        // 执行 render 函数
+        instance.render(instance.setupState)
+    } else {
+        // 模拟组件更新
+        console.log('更新组件')
+        // 重新执行 render 函数
+        instance.render(instance.setupState)
+    }
+}
+
+instance.effect = new ReactiveEffect(componentUpdateFn, () => {
+    scheduler(instance.update)
 })
-state.count++
-state.count++
-state.count++
-state.count++
-state.count++
+instance.update = instance.effect.run.bind(instance.effect)
+instance.update()
+
+
+
+// const state = reactive({ count: 0 })
+// const computedState = computed(() => state.count + 1)
+// effect(() => {
+//   console.log('观察计算属性', computedState.value)
+// })
+instance.setupState.state.count++
+instance.setupState.state.count++
+instance.setupState.state.count++
+instance.setupState.state.count++
+instance.setupState.state.count++
 
 
 </script>
