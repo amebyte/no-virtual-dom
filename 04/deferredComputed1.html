@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>从发布订阅模式的角度理解 Vue 的数据响应式原理</title>
+  </head>
+  <body>
+    <script>                 
+// 用于管理嵌套 effect 的调用栈
+const effectStack = []
+let effectTrackDepth = 0
+const maxMarkerBits = 30
+class ReactiveEffect {
+    // 存储所有包含本 effect 的依赖集合（Set）
+    // 用于实现 stop 功能时快速清理依赖
+    deps = []
+    constructor(fn, scheduler) {
+        // 包装的副作用函数（开发者传入的原始函数）
+        this._fn = fn
+        this.scheduler = scheduler
+    }
+    // 执行副作用函数，并触发依赖收集
+    run () {
+        // 这里为什么要用try...finally呢？比如如果_fn中有错误，finally块仍然会执行，保证栈的平衡。
+        try {
+            // 1. 设置当前激活的 effect 为自身
+            activeEffect = this;
+            // 2. 压入 effect 调用栈（处理嵌套 effect 的关键）
+            effectStack.push(this);
+            // 
+            effectTrackDepth++;
+            if (effectTrackDepth <= maxMarkerBits) {
+                this.initDepMarkers()
+            } else {
+                // 当递归深度超过30层时，回退到完全清理模式
+                this.cleanup()
+            }
+            // 初始化标记
+            this.initDepMarkers();
+            // 3. 执行原始函数，触发响应式属性的 getter，进行依赖收集
+            return this._fn(); // 返回函数执行结果（支持 computed 等场景）
+        } finally {
+            if (effectTrackDepth <= maxMarkerBits) {
+                this.finalizeDepMarkers()
+            }
+            effectTrackDepth--;
+            // 4. 无论执行是否抛出异常，确保以下清理逻辑一定执行
+            effectStack.pop(); // 当前 effect 出栈
+            // 5. 恢复 activeEffect 为上一个 effect（栈顶元素）或 undefined
+            activeEffect = effectStack.length > 0 ? effectStack[effectStack.length - 1] : undefined;
+        }
+    }
+    // 停止当前 effect 的响应式追踪
+    stop () {
+      // 遍历所有关联的依赖集合，从中删除本 effect
+      this.deps.forEach(dep => dep.delete(this))
+    }
+    // 初始化依赖的追踪状态标记
+    initDepMarkers() {
+        const { deps } = this
+        if (deps.length) {
+            for (let i = 0; i < deps.length; i++) {
+                // 若某个依赖在 上一轮执行 中被追踪过，其对应的位会被标记到 wasTracked 中
+                deps[i].wasTracked = deps[i].wasTracked | 1 << effectTrackDepth
+            }
+        }
+    }
+    // 清理无效依赖 并 优化依赖集合
+     finalizeDepMarkers() {
+        const { deps } = this
+        if (deps.length) {
+            for (let i = 0; i < deps.length; i++) {
+                const dep = deps[i]
+                // 根据依赖的跟踪状态，清理不再需要的依赖
+                if (wasTracked(dep) && !newTracked(dep)) {
+                    // 移除当前 effect 对该 dep 的依赖
+                    dep.delete(this)
+                }
+                // 清除该层级对应的位掩码
+                const trackOpBit = 1 << effectTrackDepth
+                dep.wasTracked = dep.wasTracked & ~trackOpBit
+                dep.newTracked = dep.newTracked & ~trackOpBit
+            }
+        }
+    }
+    // 完全清理模式
+    cleanup() {
+        const { deps } = this
+        if (deps.length) {
+            for (let i = 0; i < deps.length; i++) {
+                deps[i].delete(this)
+            }
+            deps.length = 0
+        }
+    }
+} 
+
+// 订阅者存储中心
+const targetMap  = new WeakMap()
+  // 添加订阅者
+function track(target, key) {
+    let depsMap = targetMap.get(target)
+    if (!depsMap) {
+        depsMap = new Map()
+        targetMap.set(target, depsMap)
+    }
+    let deps = depsMap.get(key)
+    if (!deps) {
+      deps = new Set()
+      // 标记依赖在 上一轮执行周期 中是否被追踪
+      deps.wasTracked = 0
+      // 标记依赖在 当前执行周期 中是否被追踪
+      deps.newTracked = 0
+      depsMap.set(key, deps)
+    }
+    trackEffects(deps)
+}
+
+function trackEffects(dep) {
+    let shouldTrack = false
+    if (!newTracked(dep)) {
+      setNewTracked(dep)
+      shouldTrack = !wasTracked(dep)
+    }
+
+    if (shouldTrack  && activeEffect) {
+        dep.add(activeEffect)
+        activeEffect.deps.push(dep)
+    }
+}
+  // 通知订阅者
+function trigger(target, key) {
+    const depsMap = targetMap.get(target)
+    if (!depsMap) return
+    const effects = depsMap.get(key)
+    triggerEffects(effects)
+}
+
+function triggerEffects(deps) {
+    deps && deps.forEach(dep => {
+        if (dep.scheduler) {
+            dep.scheduler()
+        } else {
+            dep.run()
+        }
+    })
+}
+
+let activeEffect
+// reactive
+function reactive(data) {
+    return new Proxy(data, {
+        get(target, key) {
+            // 存在依赖就把依赖收集到依赖存储中心
+            track(target, key)
+            return Reflect.get(target, key) 
+        },
+        set(target, key, val) {
+            const result = Reflect.set(target, key, val)
+            // 值更新了，就需要去把依赖存储中心中的依赖全部重新执行一遍
+            trigger(target, key)
+            return result
+        }
+    })
+}
+
+function effect(fn, scheduler) {
+    const _effect = new ReactiveEffect(fn, scheduler)
+    _effect.run()
+    const runner = _effect.run.bind(_effect)
+    runner.effect = _effect
+    return runner 
+}
+
+function newTracked(dep) {
+  return (dep.newTracked & (1 << effectTrackDepth)) !== 0;
+}
+
+function setNewTracked(dep) {
+  dep.newTracked |= (1 << effectTrackDepth); // 按位或操作
+}
+
+function wasTracked(dep) {
+  return (dep.wasTracked & (1 << effectTrackDepth)) !== 0;
+}
+
+class ComputedRefImpl {
+    dep = new Set() // 计算属性的依赖存储中心
+    _value
+    _dirty = true
+    constructor(getter) {
+       this.effect = new ReactiveEffect(getter, () => {
+           if (!this._dirty) {
+               this._dirty = true
+               scheduler(() => {
+                // 当计算属性依赖的响应式数据发生变化时，手动进行依赖触发
+                triggerEffects(this.dep)
+               })
+           }
+       }) 
+    }
+
+    get value() {
+        if (this._dirty) {
+            this._dirty = false
+            this._value = this.effect.run()
+            // 在读取计算属性值的时候，手动进行依赖收集
+            trackEffects(this.dep)
+        }
+        return this._value
+    }
+}
+
+function computed(getter) {
+    return new ComputedRefImpl(getter)
+}
+
+// const state = reactive({ count: 0 })
+// let isMounted = false
+// const componentUpdateFn = () => {
+//     if (!isMounted) {
+//         // 模拟组件初始化
+//         isMounted = true
+//         console.log('挂载组件', state.count)
+//     } else {
+//         // 模拟组件更新
+//         console.log('更新组件', state.count)
+//     }
+// }
+// const instance = {} // 模拟组件实例
+// instance.effect = new ReactiveEffect(componentUpdateFn, () => {
+//     scheduler(instance.update)
+// })
+// instance.update = instance.effect.run.bind(instance.effect)
+// instance.update()
+
+// state.count++
+// state.count++
+// state.count++
+
+// const state = reactive({ count: 0 })
+// 每个组件都有一个 render 函数，通过执行 render 函数可以生成虚拟DOM，用于渲染组件
+
+const App = {
+    setup() {
+      const state = reactive({ count: 0 })
+      return {
+        state
+      }
+    },
+    render(ctx) {
+        console.log('执行渲染函数 count:', ctx.state.count) 
+    }
+}
+
+// 模拟组件实例
+const instance = {
+  effect: null,
+  update: null,
+  render: null,
+  setupState: null,
+  isMounted: false, // 组件是否已经挂载
+} 
+
+// 初始化组件实例
+instance.setupState = App.setup()
+instance.render = App.render
+
+// 初始化组件实例
+
+// 组件渲染副作用函数
+const componentUpdateFn = () => {
+    if (!instance.isMounted) {
+        // 模拟组件初始化
+        instance.isMounted = true
+        console.log('执行beforeMount钩子')
+        // 渲染组件
+        instance.render(instance.setupState)
+        console.log('执行 mounted')
+    } else {
+        // 模拟组件更新
+        console.log('处理 beforeUpdate')
+        // 重新渲染
+        instance.render(instance.setupState)
+        console.log('触发 updated 钩子')
+    }
+}
+
+// 待执行任务队列
+const queue = []
+// 队列状态标记
+let queued = false                    
+instance.effect = new ReactiveEffect(componentUpdateFn, () => {
+    if(!queue.includes(instance.update)){
+         queue.push(instance.update)
+    }
+    if (!queued) {
+        queued = true 
+        setTimeout(() => {
+            console.log('执行异步任务')
+            // 逐个执行任务
+            queue.forEach(fn => fn())
+            // 清空队列
+            queue.length = 0
+            queued = false
+        })
+    }
+})
+instance.update = instance.effect.run.bind(instance.effect)
+instance.update()
+
+instance.setupState.state.count++
+instance.setupState.state.count++
+instance.setupState.state.count++
+
+
+</script>
+  <body>
+</html>
