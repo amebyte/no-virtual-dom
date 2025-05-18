@@ -322,10 +322,23 @@ instance.effect = new ReactiveEffect(componentUpdateFn, () => {
 instance.update = instance.effect.run.bind(instance.effect)
 instance.update()
 
-instance.setupState.state.count++
-instance.setupState.state.count++
-instance.setupState.state.count++
+// instance.setupState.state.count++
+// instance.setupState.state.count++
+// instance.setupState.state.count++
 
+
+setTimeout(() => {
+    console.log('setTimeout1')
+    for(let i = 0; i < 10000; i++) {
+        instance.setupState.state.count++
+    }
+})
+requestAnimationFrame(() => {
+    console.log('requestAnimationFrame1')
+})
+setTimeout(() => {
+    console.log('setTimeout2')
+})
 
 </script>
   <body>
