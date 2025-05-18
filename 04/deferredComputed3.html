@@ -184,7 +184,7 @@ function wasTracked(dep) {
   return (dep.wasTracked & (1 << effectTrackDepth)) !== 0;
 }
 
-class ComputedRefImpl {
+class DeferredComputedRefImpl {
     dep = new Set() // 计算属性的依赖存储中心
     _value
     _dirty = true
@@ -211,35 +211,9 @@ class ComputedRefImpl {
     }
 }
 
-function computed(getter) {
-    return new ComputedRefImpl(getter)
+function deferredComputed(getter) {
+    return new DeferredComputedRefImpl(getter)
 }
-
-// const state = reactive({ count: 0 })
-// let isMounted = false
-// const componentUpdateFn = () => {
-//     if (!isMounted) {
-//         // 模拟组件初始化
-//         isMounted = true
-//         console.log('挂载组件', state.count)
-//     } else {
-//         // 模拟组件更新
-//         console.log('更新组件', state.count)
-//     }
-// }
-// const instance = {} // 模拟组件实例
-// instance.effect = new ReactiveEffect(componentUpdateFn, () => {
-//     scheduler(instance.update)
-// })
-// instance.update = instance.effect.run.bind(instance.effect)
-// instance.update()
-
-// state.count++
-// state.count++
-// state.count++
-
-// const state = reactive({ count: 0 })
-// 每个组件都有一个 render 函数，通过执行 render 函数可以生成虚拟DOM，用于渲染组件
 
 const App = {
     setup() {
@@ -315,24 +289,14 @@ let queued = false
     queue.length = 0
     queued = false
 }                    
-// instance.effect = new ReactiveEffect(componentUpdateFn, () => {
-//     scheduler(instance.update)
-// })
-// instance.update = instance.effect.run.bind(instance.effect)
-// instance.update()
-
-// instance.setupState.state.count++
-// instance.setupState.state.count++
-// instance.setupState.state.count++
 
 const state = reactive({ count: 0 })
-const computedState = computed(() => state.count + 1)
+const computedState = deferredComputed(() => state.count % 2)
 effect(() => {
   console.log('观察计算属性', computedState.value)
 })
-state.count++
-state.count++
-state.count++
+state.count =1
+state.count =2
 
 
 </script>
