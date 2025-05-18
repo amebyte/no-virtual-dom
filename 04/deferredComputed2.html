@@ -286,6 +286,8 @@ const componentUpdateFn = () => {
     }
 }
 
+// 微任务触发器
+const tick = Promise.resolve()        
 // 待执行任务队列
 const queue = []
 // 队列状态标记
@@ -300,7 +302,7 @@ let queued = false
   }
   if (!queued) {                      // 避免重复调度
     queued = true
-    setTimeout(flush)                  // 下一个任务阶段执行队列
+    tick.then(flush)                  // 下一个任务阶段执行队列
   }
 }
 /**
