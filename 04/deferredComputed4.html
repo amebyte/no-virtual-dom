@@ -192,9 +192,13 @@ class DeferredComputedRefImpl {
        this.effect = new ReactiveEffect(getter, () => {
            if (!this._dirty) {
                this._dirty = true
+               // 先缓存当前值
+               const valueToCompare = this._value
                scheduler(() => {
-                // 当计算属性依赖的响应式数据发生变化时，手动进行依赖触发
-                triggerEffects(this.dep)
+                    // 获取最新值和上一次缓存的值进行比较
+                    if (this.value !== valueToCompare) {
+                        triggerEffects(this.dep)
+                    }
                })
            }
        }) 
@@ -295,8 +299,8 @@ const computedState = deferredComputed(() => state.count % 2)
 effect(() => {
   console.log('观察计算属性', computedState.value)
 })
-state.count =1
-state.count =2
+state.count = 1
+state.count = 2
 
 
 </script>
