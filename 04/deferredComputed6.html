@@ -184,6 +184,35 @@ function wasTracked(dep) {
   return (dep.wasTracked & (1 << effectTrackDepth)) !== 0;
 }
 
+class ComputedRefImpl {
+    dep = new Set() // 计算属性的依赖存储中心
+    _value
+    _dirty = true
+    constructor(getter) {
+       this.effect = new ReactiveEffect(getter, () => {
+           if (!this._dirty) {
+               this._dirty = true
+               // 当计算属性依赖的响应式数据发生变化时，手动进行依赖触发
+               triggerEffects(this.dep)
+           }
+       }) 
+    }
+
+    get value() {
+        if (this._dirty) {
+            this._dirty = false
+            this._value = this.effect.run()
+            // 在读取计算属性值的时候，手动进行依赖收集
+            trackEffects(this.dep)
+        }
+        return this._value
+    }
+}
+
+function computed(getter) {
+    return new ComputedRefImpl(getter)
+}
+
 class DeferredComputedRefImpl {
     dep = new Set() // 计算属性的依赖存储中心
     _value
@@ -252,12 +281,12 @@ let queued = false
 }                    
 
 const state = reactive({ count: 0 })
-const computedState = deferredComputed(() => state.count + 1)
-const computedState1 = deferredComputed(() => computedState.value + 1)
+const computedState = deferredComputed(() => state.count % 2)
+const computedState1 = computed(() => computedState.value + 1)
 effect(() => {
   console.log('观察计算属性', computedState1.value)
 })
-state.count = 1
+state.count = 2
 
 
 </script>
