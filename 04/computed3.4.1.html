@@ -10,6 +10,7 @@
 const effectStack = []
 let effectTrackDepth = 0
 const maxMarkerBits = 30
+let shouldTrack = true
 class ReactiveEffect {
     // 存储所有包含本 effect 的依赖集合（Set）
     // 用于实现 stop 功能时快速清理依赖
@@ -29,23 +30,27 @@ class ReactiveEffect {
             // 2. 压入 effect 调用栈（处理嵌套 effect 的关键）
             effectStack.push(this);
             // 
-            effectTrackDepth++;
             this._runnings++
-            if (effectTrackDepth <= maxMarkerBits) {
-                this.initDepMarkers()
-            } else {
-                // 当递归深度超过30层时，回退到完全清理模式
-                this.cleanup()
+            if (shouldTrack) {
+                effectTrackDepth++;
+                if (effectTrackDepth <= maxMarkerBits) {
+                    this.initDepMarkers()
+                } else {
+                    // 当递归深度超过30层时，回退到完全清理模式
+                    this.cleanup()
+                }
             }
             // 初始化标记
-            this.initDepMarkers();
+            // this.initDepMarkers();
             // 3. 执行原始函数，触发响应式属性的 getter，进行依赖收集
             return this._fn(); // 返回函数执行结果（支持 computed 等场景）
         } finally {
-            if (effectTrackDepth <= maxMarkerBits) {
-                this.finalizeDepMarkers()
+            if (shouldTrack) {
+                if (effectTrackDepth <= maxMarkerBits) {
+                    this.finalizeDepMarkers()
+                }
+                effectTrackDepth--;
             }
-            effectTrackDepth--;
             this._runnings--
             // 4. 无论执行是否抛出异常，确保以下清理逻辑一定执行
             effectStack.pop(); // 当前 effect 出栈
@@ -120,19 +125,22 @@ function track(target, key) {
 }
 
 function trackEffects(dep) {
-    let shouldTrack = false
-    if (!newTracked(dep)) {
-      setNewTracked(dep)
-      shouldTrack = !wasTracked(dep)
-    }
+    if (shouldTrack) {
+        shouldTrack = false
+        if (!newTracked(dep)) {
+            setNewTracked(dep)
+            shouldTrack = !wasTracked(dep)
+        }
 
-    if (shouldTrack  && activeEffect) {
-        dep.add(activeEffect)
-        activeEffect.deps.push(dep)
+        if (shouldTrack  && activeEffect) {
+            dep.add(activeEffect)
+            activeEffect.deps.push(dep)
+        }
     }
 }
   // 通知订阅者
 function trigger(target, key) {
+    console.log('通知');
     const depsMap = targetMap.get(target)
     if (!depsMap) return
     const effects = depsMap.get(key)
@@ -140,15 +148,16 @@ function trigger(target, key) {
 }
 
 function triggerEffects(deps) {
-    pauseScheduling()
+    // pauseScheduling()
     deps && deps.forEach(dep => {
-        console.log('dep', dep)
-        if (dep.scheduler && !dep._runnings) {
-            // dep.scheduler()
-            queueEffectSchedulers.push(dep.scheduler)
+        if (dep.scheduler) {
+            dep.scheduler()
+            // queueEffectSchedulers.push(dep.scheduler)
+        } else {
+            dep.run();
         }
     })
-    resetScheduling()
+    // resetScheduling()
 }
 
 let activeEffect
@@ -171,7 +180,22 @@ function reactive(data) {
 
 function effect(fn) {
     const _effect = new ReactiveEffect(fn, () => {
-        _effect.run()
+        let dirty = false
+        shouldTrack = false
+        for (const dep of _effect.deps) {
+            if (dep.computed) {
+                if(!Object.is(dep.computed._value, dep.computed.effect.run())) {
+                    dirty = true
+                    break
+                } else {
+                    dep.computed._dirty = false
+                }
+            }
+        }
+        shouldTrack = true
+        if (dirty) {
+            _effect.run()
+        }
     })
     _effect.run()
     const runner = _effect.run.bind(_effect)
@@ -197,7 +221,9 @@ class ComputedRefImpl {
     _dirty = true
     constructor(getter) {
        this.effect = new ReactiveEffect(getter, () => {
+            console.log('变');
            if (!this._dirty) {
+            console.log('变2');
                this._dirty = true
                // 当计算属性依赖的响应式数据发生变化时，手动进行依赖触发
                triggerEffects(this.dep)
@@ -210,6 +236,7 @@ class ComputedRefImpl {
             this._dirty = false
             this._value = this.effect.run()
             // 在读取计算属性值的时候，手动进行依赖收集
+            this.dep.computed = this
             trackEffects(this.dep)
         }
         return this._value
@@ -317,7 +344,7 @@ function pauseScheduling() {
 }
 
 function resetScheduling() {
-    console.log('重置调度', queueEffectSchedulers)
+    // console.log('重置调度', queueEffectSchedulers)
   pauseScheduleStack--
   while (!pauseScheduleStack && queueEffectSchedulers.length) {
     queueEffectSchedulers.shift()()
@@ -325,14 +352,15 @@ function resetScheduling() {
 }
 
 const state = reactive({ count: 0 })
-const computedState = computed(() => state.count + 1)
+const computedState = computed(() => state.count % 2)
 effect(() => {
   console.log('观察计算属性', computedState.value)
 })
 
-state.count++
-state.count++
-state.count++
+state.count = 2
+state.count = 3
+state.count = 5
+
 
 </script>
   <body>
