@@ -24,7 +24,7 @@ class ReactiveEffect {
     }
     // 执行副作用函数，并触发依赖收集
     run () {
-        this._dirtyLevel = 0
+        // this._dirtyLevel = 0
         // 这里为什么要用try...finally呢？比如如果_fn中有错误，finally块仍然会执行，保证栈的平衡。
         try {
             // 1. 设置当前激活的 effect 为自身
@@ -145,7 +145,7 @@ function trigger(target, key) {
     const depsMap = targetMap.get(target)
     if (!depsMap) return
     const effects = depsMap.get(key)
-    triggerEffects(effects, 1)
+    triggerEffects(effects, 2)
 }
 
 function triggerEffects(deps, dirtyLevel) {
@@ -186,8 +186,10 @@ function effect(fn) {
         if (_effect._dirtyLevel === 1) {
             shouldTrack = false
             for (const dep of _effect.deps) {
+                console.log('dep11', dep)
                 if (dep.computed) {
-                    if(!Object.is(dep.computed._value, dep.computed.effect.run())) {
+                    // dep.computed.value
+                    if(!Object.is(dep.computed._value, dep.computed.value)) {
                         dirty = true
                         dep.computed.effect._dirtyLevel = 2
                         break
@@ -221,16 +223,35 @@ function wasTracked(dep) {
 class ComputedRefImpl {
     dep = new Set() // 计算属性的依赖存储中心
     _value
-    _dirty = true
     constructor(getter) {
        this.effect = new ReactiveEffect(getter, () => {
             // 当计算属性依赖的响应式数据发生变化时，手动进行依赖触发
             triggerEffects(this.dep, 1)
        }) 
+       // 标记计算属性为计算属性
+    //    this.effect.computed = this
     }
 
     get value() {
-        if (this.effect._dirtyLevel === 2) {
+        let dirty = false
+        if (this.effect._dirtyLevel === 1) {
+            shouldTrack = false
+            for (const dep of this.effect.deps) {
+                console.log('computed', dep.computed)
+                if (dep.computed) {
+                    if(!Object.is(dep.computed._value, dep.computed.value)) {
+                        dirty = true
+                        // dep.computed.effect._dirtyLevel = 2
+                        break
+                    }
+                }
+            }
+            shouldTrack = true
+        } else if (this.effect._dirtyLevel === 2) {
+            console.log('ddddd');
+            dirty = true
+        }
+        if (dirty) {
             this._value = this.effect.run()
             // 在读取计算属性值的时候，手动进行依赖收集
             this.dep.computed = this

@@ -16,6 +16,7 @@ class ReactiveEffect {
     // 用于实现 stop 功能时快速清理依赖
     deps = []
     _runnings = 0
+    _dirtyLevel = 2
     constructor(fn, scheduler) {
         // 包装的副作用函数（开发者传入的原始函数）
         this._fn = fn
@@ -23,6 +24,7 @@ class ReactiveEffect {
     }
     // 执行副作用函数，并触发依赖收集
     run () {
+        // this._dirtyLevel = 0
         // 这里为什么要用try...finally呢？比如如果_fn中有错误，finally块仍然会执行，保证栈的平衡。
         try {
             // 1. 设置当前激活的 effect 为自身
@@ -140,16 +142,16 @@ function trackEffects(dep) {
 }
   // 通知订阅者
 function trigger(target, key) {
-    console.log('通知');
     const depsMap = targetMap.get(target)
     if (!depsMap) return
     const effects = depsMap.get(key)
-    triggerEffects(effects)
+    triggerEffects(effects, 2)
 }
 
-function triggerEffects(deps) {
+function triggerEffects(deps, dirtyLevel) {
     // pauseScheduling()
     deps && deps.forEach(dep => {
+        dep._dirtyLevel = dirtyLevel
         if (dep.scheduler) {
             dep.scheduler()
             // queueEffectSchedulers.push(dep.scheduler)
@@ -181,18 +183,23 @@ function reactive(data) {
 function effect(fn) {
     const _effect = new ReactiveEffect(fn, () => {
         let dirty = false
-        shouldTrack = false
-        for (const dep of _effect.deps) {
-            if (dep.computed) {
-                if(!Object.is(dep.computed._value, dep.computed.value)) {
-                    dirty = true
-                    break
-                } else {
-                    dep.computed._dirty = false
+        if (_effect._dirtyLevel === 1) {
+            shouldTrack = false
+            for (const dep of _effect.deps) {
+                console.log('dep11', dep)
+                if (dep.computed) {
+                    // dep.computed.value
+                    if(!Object.is(dep.computed._value, dep.computed.value)) {
+                        dirty = true
+                        dep.computed.effect._dirtyLevel = 2
+                        break
+                    }
                 }
             }
+            shouldTrack = true
+        } else if (_effect._dirtyLevel === 2) {
+            dirty = true
         }
-        shouldTrack = true
         if (dirty) {
             _effect.run()
         }
@@ -218,22 +225,35 @@ function wasTracked(dep) {
 class ComputedRefImpl {
     dep = new Set() // 计算属性的依赖存储中心
     _value
-    _dirty = true
     constructor(getter) {
        this.effect = new ReactiveEffect(getter, () => {
-            console.log('变');
-           if (!this._dirty) {
-            console.log('变2');
-               this._dirty = true
-               // 当计算属性依赖的响应式数据发生变化时，手动进行依赖触发
-               triggerEffects(this.dep)
-           }
+            // 当计算属性依赖的响应式数据发生变化时，手动进行依赖触发
+            triggerEffects(this.dep, 1)
        }) 
+       // 标记计算属性为计算属性
+    //    this.effect.computed = this
     }
 
     get value() {
-        if (this._dirty) {
-            this._dirty = false
+        let dirty = false
+        if (this.effect._dirtyLevel === 1) {
+            shouldTrack = false
+            for (const dep of this.effect.deps) {
+                console.log('computed', dep.computed)
+                if (dep.computed) {
+                    if(!Object.is(dep.computed._value, dep.computed.value)) {
+                        dirty = true
+                        // dep.computed.effect._dirtyLevel = 2
+                        break
+                    }
+                }
+            }
+            shouldTrack = true
+        } else if (this.effect._dirtyLevel === 2) {
+            console.log('ddddd');
+            dirty = true
+        }
+        if (dirty) {
             this._value = this.effect.run()
             // 在读取计算属性值的时候，手动进行依赖收集
             this.dep.computed = this
@@ -352,15 +372,25 @@ function resetScheduling() {
 }
 
 const state = reactive({ count: 0 })
-const computedState = computed(() => state.count % 2)
-effect(() => {
-  console.log('观察计算属性', computedState.value)
+const computedState = computed(() => {
+    console.log('computed1')
+    return state.count % 2
 })
-
+const computedState2 = computed(() => {
+    console.log('computed2')
+    return computedState.value + 1
+})
+effect(() => {
+  console.log('观察计算属性', computedState2.value)
+})
+effect(() => {
+  console.log('普通响应式', state.count)
+})
 state.count = 2
-state.count = 3
-state.count = 5
+// src.value = 4
+// src.value = 6
 
+// 我们希望计算属性
 
 </script>
   <body>
