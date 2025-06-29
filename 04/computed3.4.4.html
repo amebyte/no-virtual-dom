@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Vue3.4 的数据响应式原理</title>
+    <title>Vue3.4 的数据响应式原理 如果计算属性使用与普通变量相同的脏标记级别会引起死循环</title>
   </head>
   <body>
     <script>                 
@@ -24,6 +24,7 @@ class ReactiveEffect {
     }
     // 执行副作用函数，并触发依赖收集
     run () {
+        let lastShouldTrack = shouldTrack
         // this._dirtyLevel = 0
         // 这里为什么要用try...finally呢？比如如果_fn中有错误，finally块仍然会执行，保证栈的平衡。
         try {
@@ -58,6 +59,7 @@ class ReactiveEffect {
             effectStack.pop(); // 当前 effect 出栈
             // 5. 恢复 activeEffect 为上一个 effect（栈顶元素）或 undefined
             activeEffect = effectStack.length > 0 ? effectStack[effectStack.length - 1] : undefined;
+            shouldTrack = lastShouldTrack
         }
     }
     // 停止当前 effect 的响应式追踪
@@ -145,6 +147,7 @@ function trigger(target, key) {
     const depsMap = targetMap.get(target)
     if (!depsMap) return
     const effects = depsMap.get(key)
+    console.log('触发', effects)
     triggerEffects(effects, 2)
 }
 
@@ -186,7 +189,6 @@ function effect(fn) {
         if (_effect._dirtyLevel === 1) {
             shouldTrack = false
             for (const dep of _effect.deps) {
-                console.log('dep11', dep)
                 if (dep.computed) {
                     // dep.computed.value
                     if(!Object.is(dep.computed._value, dep.computed.value)) {
@@ -265,62 +267,8 @@ function computed(getter) {
     return new ComputedRefImpl(getter)
 }
 
-class DeferredComputedRefImpl {
-    dep = new Set() // 计算属性的依赖存储中心
-    _value
-    _dirty = true
-    constructor(getter) {
-        // 用于比较的旧值
-        let compareTarget
-        // 是否有有效旧值
-        let hasCompareTarget = false
-
-       this.effect = new ReactiveEffect(getter, (computedTrigger) => {
-           if (this.dep.size) {
-               // 只有在非同步触发时才需要触发延迟计算属性
-               if (computedTrigger) {
-                // 记录当前值作为比较基准
-                compareTarget = this._value
-                hasCompareTarget = true
-               } else {
-               // 先缓存当前值，不能通过 compareTarget 是否有值来判断，因为 compareTarget 有可能本身值就是空值
-               const valueToCompare = hasCompareTarget ? compareTarget : this._value
-               hasCompareTarget = false
-               scheduler(() => {
-                    console.log('延迟计算属性更新') 
-                    // 获取最新值和上一次缓存的值进行比较
-                    if (this.value !== valueToCompare) {
-                        triggerEffects(this.dep)
-                    }
-               })
-               // 同步触发链式相关计算属性的更新，确保同步访问时值的正确
-               for (const e of this.dep) {
-                // 仅处理计算属性依赖
-                if (e.computed) {
-                    e.scheduler(true /* 标记为同步触发 */)
-                }
-               }
-            }
-           }
-           this._dirty = true
-       }) 
-        // 标记计算属性为计算属性
-        this.effect.computed = true
-    }
-
-    get value() {
-        if (this._dirty) {
-            this._dirty = false
-            this._value = this.effect.run()
-            // 在读取计算属性值的时候，手动进行依赖收集
-            trackEffects(this.dep)
-        }
-        return this._value
-    }
-}
-
 function deferredComputed(getter) {
-    return new DeferredComputedRefImpl(getter)
+    return new ComputedRefImpl(getter)
 }
 
 // 微任务触发器
@@ -372,21 +320,15 @@ function resetScheduling() {
 const state = reactive({ count: 0 })
 const computedState = computed(() => {
     console.log('computed1')
-    return state.count % 2
+    state.count++
+    return state.count
 })
-const computedState2 = computed(() => {
-    console.log('computed2')
-    return computedState.value + 1
-})
+
 effect(() => {
-  console.log('观察计算属性', computedState2.value)
-})
-effect(() => {
-  console.log('普通响应式', state.count)
+  console.log('观察计算属性', computedState.value)
 })
 state.count = 2
-// src.value = 4
-// src.value = 6
+
 
 // 我们希望计算属性
 
