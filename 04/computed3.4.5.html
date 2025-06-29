@@ -11,17 +11,12 @@ const effectStack = []
 let effectTrackDepth = 0
 const maxMarkerBits = 30
 let shouldTrack = true
-const DirtyLevels = {
-  ComputedValueMaybeDirty: 1, // 计算属性可能脏了（需要验证）
-  ComputedValueDirty: 2, // 计算属性确定脏了(需要重新计算)
-  Dirty: 3 // 普通响应式变量(需要立即执行)
-}
 class ReactiveEffect {
     // 存储所有包含本 effect 的依赖集合（Set）
     // 用于实现 stop 功能时快速清理依赖
     deps = []
     _runnings = 0
-    _dirtyLevel = DirtyLevels.Dirty
+    _dirtyLevel = 2
     constructor(fn, scheduler) {
         // 包装的副作用函数（开发者传入的原始函数）
         this._fn = fn
@@ -152,13 +147,12 @@ function trigger(target, key) {
     const depsMap = targetMap.get(target)
     if (!depsMap) return
     const effects = depsMap.get(key)
-    triggerEffects(effects, DirtyLevels.Dirty)
+    triggerEffects(effects, 2)
 }
 
 function triggerEffects(deps, dirtyLevel) {
     // pauseScheduling()
     deps && deps.forEach(effect => {
-        console.log('effect', effect)
         if (!effect._runnings) {
             effect._dirtyLevel = dirtyLevel
             if (effect.scheduler) {
@@ -191,20 +185,20 @@ function reactive(data) {
 function effect(fn) {
     const _effect = new ReactiveEffect(fn, () => {
         let dirty = false
-        if (_effect._dirtyLevel === DirtyLevels.ComputedValueMaybeDirty) {
+        if (_effect._dirtyLevel === 1) {
             shouldTrack = false
             for (const dep of _effect.deps) {
                 if (dep.computed) {
                     // dep.computed.value
                     if(!Object.is(dep.computed._value, dep.computed.value)) {
                         dirty = true
-                        dep.computed.effect._dirtyLevel = DirtyLevels.ComputedValueDirty
+                        dep.computed.effect._dirtyLevel = 2
                         break
                     }
                 }
             }
             shouldTrack = true
-        } else if (_effect._dirtyLevel >= DirtyLevels.ComputedValueDirty) {
+        } else if (_effect._dirtyLevel === 2) {
             dirty = true
         }
         if (dirty) {
@@ -235,7 +229,7 @@ class ComputedRefImpl {
     constructor(getter) {
        this.effect = new ReactiveEffect(getter, () => {
             // 当计算属性依赖的响应式数据发生变化时，手动进行依赖触发
-            triggerEffects(this.dep, DirtyLevels.ComputedValueMaybeDirty)
+            triggerEffects(this.dep, 1)
        }) 
        // 标记计算属性为计算属性
     //    this.effect.computed = this
@@ -243,7 +237,7 @@ class ComputedRefImpl {
 
     get value() {
         let dirty = false
-        if (this.effect._dirtyLevel === DirtyLevels.ComputedValueMaybeDirty) {
+        if (this.effect._dirtyLevel === 1) {
             shouldTrack = false
             for (const dep of this.effect.deps) {
                 if (dep.computed) {
@@ -255,7 +249,7 @@ class ComputedRefImpl {
                 }
             }
             shouldTrack = true
-        } else if (this.effect._dirtyLevel >= DirtyLevels.ComputedValueDirty) {
+        } else if (this.effect._dirtyLevel === 2) {
             dirty = true
         }
         if (dirty) {
@@ -324,7 +318,6 @@ function resetScheduling() {
 
 const state = reactive({ count: 0 })
 const computedState = computed(() => {
-    console.log('computed1')
     state.count++
     return state.count
 })
