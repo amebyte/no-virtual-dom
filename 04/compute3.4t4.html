@@ -42,6 +42,8 @@ class ReactiveEffect {
     }
     // 执行副作用函数，并触发依赖收集
     run () {
+        // 更新脏标记，代表无需更新
+        this._dirtyLevel = 0
         // 这里为什么要用try...finally呢？比如如果_fn中有错误，finally块仍然会执行，保证栈的平衡。
         try {
             // 1. 设置当前激活的 effect 为自身
@@ -170,10 +172,14 @@ let pauseSchedule = false
 const queueEffectSchedulers = []
 function triggerEffects(deps, dirtyLevel) {
     deps && deps.forEach(dep => {
+        const lastDirtyLevel = dep._dirtyLevel
         dep._dirtyLevel = dirtyLevel
-        if (dep.scheduler) {
-            // 收集所有调度任务，最后批量执行
-            queueEffectSchedulers.push(dep.scheduler)
+        // 只有第一次更新的时候才进行任务收集，后续再更新就不再进行任务收集了
+        if (lastDirtyLevel === 0) {
+            if (dep.scheduler) {
+                // 收集所有调度任务，最后批量执行
+                queueEffectSchedulers.push(dep.scheduler)
+            }
         }
     })
 }
@@ -306,8 +312,8 @@ state.count = 2
 state.count = 3
 // 开启调度
 // pauseSchedule = true
-// 判断是否可以执行副作用函数
-if(queueEffectSchedulers.length) {
+// 取出所有副作用函数并执行
+while(queueEffectSchedulers.length) {
     // 使用 FIFO（先进先出）队列确保执行顺序
     queueEffectSchedulers.shift()()
 }
