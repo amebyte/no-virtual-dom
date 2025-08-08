@@ -27,6 +27,7 @@ class ReactiveEffect {
         let dirty = false
         // 需要验证计算属性是否脏状态
         if (this._dirtyLevel === 1) {
+            console.log('验证')
             this._dirtyLevel = 0
             shouldTrack = false
             for (const dep of this.deps) {
@@ -193,10 +194,10 @@ function triggerEffects(deps, dirtyLevel) {
     pauseScheduling()
     deps && deps.forEach(effect => {
         // 只有不是运行状态才能触发
-        if (!effect._runnings) {
+        if (effect._dirtyLevel < dirtyLevel && !effect._runnings) {
             const lastDirtyLevel = effect._dirtyLevel
             effect._dirtyLevel = dirtyLevel
-            // 只有第一次更新的时候才进行任务收集，后续再更新就不再进行任务收集了
+            // 确保只在副作用从“干净”状态转变为“脏”状态时执行触发操作
             if (lastDirtyLevel === 0) {
                 effect.trigger()
                 if (effect.scheduler) {
@@ -317,31 +318,15 @@ let queued = false
     queued = false
 }
 
-// 普通响应式变量
-const userId = reactive({ value: 1 })
-const isAdmin = reactive({ value: false })
-
-// 权限集合计算属性
-const userPermissions = computed(() => {
-  return isAdmin.value ? ['create', 'delete'] : ['read']
-})
-
-// 是否能删除计算属性
-const canDelete = computed(() => {
-  return userPermissions.value.includes('delete')
-})
-
-// UI渲染
+const count1 = reactive({ value: 0 })
+const count2 = reactive({ value: 0 })
+const c1 = computed(() => count1.value)
 effect(() => {
-  console.log(`User ${userId.value} can delete: ${canDelete.value}`)
+   console.log('UI渲染', c1.value, count2.value); 
 })
-effect(() => {
-    console.log('观察', userPermissions.value)
-})
-// 我们希望计算属性
 pauseScheduling()
-userId.value = 2
-isAdmin.value = true
+count2.value = 1
+count1.value = 2
 resetScheduling()
 
 
