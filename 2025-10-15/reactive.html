@@ -110,7 +110,9 @@ function track(target, key) {
 }
 
 function trackEffect(effect, dep) {
+    // 在 dep 中记录 effect 和它的当前 _trackId
     dep.set(effect, effect._trackId)
+    // 将 dep 存储到 effect 的 deps 数组的当前 _depsLength 位
     effect.deps[effect._depsLength++] = dep
 }
   // 通知订阅者
