@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>版本化动态依赖管理机制解析</title>
+  </head>
+  <body>
+    <script>                 
+// 用于管理嵌套 effect 的调用栈
+const effectStack = []
+let effectTrackDepth = 0
+const maxMarkerBits = 30
+let shouldTrack = true
+const DirtyLevels = {
+  NotDirty: 0, // 无需更新
+  ComputedValueMaybeDirty: 1, // 可能脏了，需要验证
+  ComputedValueDirty: 2, // 确定脏了，需要重新计算
+  Dirty: 3 // 一定脏，必须运行
+}
+class ReactiveEffect {
+    // 存储所有包含本 effect 的依赖集合（Set）
+    // 用于实现 stop 功能时快速清理依赖
+    deps = []
+    _runnings = 0
+    _dirtyLevel = DirtyLevels.Dirty // 默认无需验证，强制更新
+    _trackId = 0 // 用于标记依赖的版本号
+    _depsLength = 0 // 用于记录当前一轮依赖收集中，effect 实际使用到的依赖数量
+    constructor(fn, trigger, scheduler) {
+        // 包装的副作用函数（开发者传入的原始函数）
+        this._fn = fn
+        this.trigger = trigger
+        this.scheduler = scheduler
+    }
+    get dirty() {
+        let dirty = false
+        // 需要验证计算属性是否脏状态
+        if (this._dirtyLevel === DirtyLevels.ComputedValueMaybeDirty) {
+            // 已经响应了依赖的变化，因此需要重置其脏标记，表示当前副作用的状态是最新的，无需再次运行
+            this._dirtyLevel = DirtyLevels.NotDirty
+            shouldTrack = false
+            for (const dep of this.deps) {
+                if (dep.computed) {
+                    dep.computed.value
+                    if (this._dirtyLevel >= DirtyLevels.ComputedValueDirty) {
+                        dirty = true
+                        break
+                    }
+                }
+            }
+            shouldTrack = true
+        } else if (this._dirtyLevel >= DirtyLevels.ComputedValueDirty) {
+            // 无需验证强制更新
+            dirty = true
+        }
+        return dirty
+    }
+    set dirty(v) {
+        this._dirtyLevel = v ? DirtyLevels.Dirty : DirtyLevels.NotDirty
+    }
+    // 执行副作用函数，并触发依赖收集
+    run () {
+        // 更新脏标记，代表无需更新
+        this._dirtyLevel = DirtyLevels.NotDirty
+        // 这里为什么要用try...finally呢？比如如果_fn中有错误，finally块仍然会执行，保证栈的平衡。
+        try {
+            // 1. 设置当前激活的 effect 为自身
+            activeEffect = this;
+            // 2. 压入 effect 调用栈（处理嵌套 effect 的关键）
+            effectStack.push(this);
+            // 
+            this._runnings++
+            // 标记当前 effect 的版本号，每次执行前都会自增，这样，下次依赖收集时，之前的依赖关系就会被认为是旧的
+            this._trackId++
+            // 标记当前 effect 的依赖数量，每次执行前都会重置为 0，表示开始新一轮的依赖收集，新的依赖会从 deps 数组的0位置开始覆盖
+            this._depsLength = 0
+            // 3. 执行原始函数，触发响应式属性的 getter，进行依赖收集
+            return this._fn(); // 返回函数执行结果（支持 computed 等场景）
+        } finally {
+            postCleanupEffect(this);
+            this._runnings--
+            // 4. 无论执行是否抛出异常，确保以下清理逻辑一定执行
+            effectStack.pop(); // 当前 effect 出栈
+            // 5. 恢复 activeEffect 为上一个 effect（栈顶元素）或 undefined
+            activeEffect = effectStack.length > 0 ? effectStack[effectStack.length - 1] : undefined;
+        }
+    }
+    // 停止当前 effect 的响应式追踪
+    stop () {
+      // 遍历所有关联的依赖集合，从中删除本 effect
+      this.deps.forEach(dep => dep.delete(this))
+    }
+} 
+
+function postCleanupEffect(effect) {
+  // 检查 effect.deps 数组：如果数组长度大于当前的 _depsLength，说明上一轮收集的依赖数量比这一轮多，则从 _depsLength 索引开始到数组末尾的依赖都是这一轮没有重新收集的，也就是过时的。
+  if (effect.deps && effect.deps.length > effect._depsLength) {
+    for (let i = effect._depsLength; i < effect.deps.length; i++) {
+        // 删除过时的依赖
+        // effect.deps[i].delete(effect)
+        cleanupDepEffect(effect.deps[i], effect)
+    }
+    // 将 effect.deps 数组的长度截断为 _depsLength，这样，下一轮依赖收集时，数组前面 _depsLength 个位置是有效的，后面被清理掉的位置会被覆盖或新增
+    effect.deps.length = effect._depsLength
+  }
+}
+
+function cleanupDepEffect(dep, effect) {
+  const trackId = dep.get(effect)
+  // 如果 dep 中存储的 trackId 不等于 effect 当前的 _trackId，说明这个 effect 在这一轮中不再依赖这个 dep，则从 dep 中删除这个 effect
+  if (trackId !== undefined && effect._trackId !== trackId) {
+    dep.delete(effect)
+  }
+}
+
+// 订阅者存储中心
+const targetMap  = new WeakMap()
+// 添加订阅者
+function track(target, key) {
+    if (shouldTrack  && activeEffect) {
+        let depsMap = targetMap.get(target)
+        if (!depsMap) {
+            depsMap = new Map()
+            targetMap.set(target, depsMap)
+        }
+        let deps = depsMap.get(key)
+        if (!deps) {
+            deps = new Map();
+            depsMap.set(key, deps)
+        }
+        trackEffect(activeEffect, deps)
+    }
+}
+
+function trackEffect(effect, dep) {
+    // 在 dep 中记录 effect 和它的当前 _trackId
+    dep.set(effect, effect._trackId)
+
+    const oldDep = effect.deps[effect._depsLength]
+    // 如果 oldDep 存在且不等于当前 dep，则说明这个 oldDep 可能已经过时，需要清理
+    if (oldDep !== dep) {
+      if (oldDep) {
+        // 清理 oldDep 中对该 effect 的引用
+        oldDep.delete(effect);
+      }
+      // 将 dep 存储到 effect 的 deps 数组的当前 _depsLength 位
+      effect.deps[effect._depsLength++] = dep
+    } else {
+      // 如果 oldDep 等于当前 dep，则直接增加 _depsLength（这种情况应该很少，因为一般同一个 dep 不会连续多次收集同一个 effect）
+      effect._depsLength++
+    }
+}
+// 通知订阅者
+function trigger(target, key) {
+    const depsMap = targetMap.get(target)
+    if (!depsMap) return
+    const effects = depsMap.get(key)
+    triggerEffects(effects, DirtyLevels.Dirty)
+}
+// 暂停深度计数器
+let pauseScheduleStack = 0
+// 定义一个全局变量存储副作用函数
+const queueEffectSchedulers = []
+// 暂停调度
+function pauseScheduling() {
+  pauseScheduleStack++
+}
+// 开启调度
+function resetScheduling() {
+    pauseScheduleStack--
+    // 取出所有副作用函数并执行
+    while(!pauseScheduleStack && queueEffectSchedulers.length) {
+        // 使用 FIFO（先进先出）队列确保执行顺序
+        queueEffectSchedulers.shift()()
+    }
+}
+
+function triggerEffects(deps, dirtyLevel) {
+    pauseScheduling()
+    for (const effect of deps.keys()) { 
+        // 只有不是运行状态才能触发
+        if (effect._dirtyLevel < dirtyLevel && !effect._runnings) {
+            const lastDirtyLevel = effect._dirtyLevel
+            effect._dirtyLevel = dirtyLevel
+            // 确保只在副作用从“干净”状态转变为“脏”状态时执行触发操作
+            if (lastDirtyLevel === DirtyLevels.NotDirty && dirtyLevel !== DirtyLevels.ComputedValueDirty) {
+                effect.trigger()
+                if (effect.scheduler) {
+                    // 收集所有调度任务，最后批量执行
+                    queueEffectSchedulers.push(effect.scheduler)
+                }
+            }
+        }
+    }
+    resetScheduling()
+}
+
+let activeEffect
+// reactive
+function reactive(data) {
+    return new Proxy(data, {
+        get(target, key) {
+            // 存在依赖就把依赖收集到依赖存储中心
+            track(target, key)
+            return Reflect.get(target, key) 
+        },
+        set(target, key, val) {
+            const result = Reflect.set(target, key, val)
+            // 值更新了，就需要去把依赖存储中心中的依赖全部重新执行一遍
+            trigger(target, key)
+            return result
+        }
+    })
+}
+
+function effect(fn) {
+    const _effect = new ReactiveEffect(fn, () => {}, () => {
+        if (_effect.dirty) {
+            _effect.run()
+        }
+    })
+    _effect.run()
+    const runner = _effect.run.bind(_effect)
+    runner.effect = _effect
+    return runner 
+}
+
+function newTracked(dep) {
+  return (dep.newTracked & (1 << effectTrackDepth)) !== 0;
+}
+
+function setNewTracked(dep) {
+  dep.newTracked |= (1 << effectTrackDepth); // 按位或操作
+}
+
+function wasTracked(dep) {
+  return (dep.wasTracked & (1 << effectTrackDepth)) !== 0;
+}
+
+class ComputedRefImpl {
+    dep = new Set() // 计算属性的依赖存储中心
+    _value
+    _dirty = true
+    constructor(getter) {
+       this.effect = new ReactiveEffect(getter, () => {
+            // 当计算属性依赖的响应式数据发生变化时，手动进行依赖触发
+            triggerEffects(this.dep, DirtyLevels.ComputedValueMaybeDirty)
+       }) 
+    }
+
+    get value() {
+        // 在读取计算属性值的时候，手动进行依赖收集
+        this.dep.computed = this
+        trackEffects(this.dep)
+        if (this.effect.dirty) {
+            const newValue = this.effect.run()
+            if(!Object.is(this._value, newValue)) {
+                this._value = newValue
+                triggerEffects(this.dep, DirtyLevels.ComputedValueDirty)
+            }
+        }
+        return this._value
+    }
+}
+
+function computed(getter) {
+    return new ComputedRefImpl(getter)
+}
+
+function deferredComputed(getter) {
+    return new ComputedRefImpl(getter)
+}
+
+// 微任务触发器
+const tick = Promise.resolve()        
+// 待执行任务队列
+const queue = []
+// 队列状态标记
+let queued = false
+/**
+ * 调度器核心逻辑：将任务加入队列，并确保在异步阶段批量执行
+ * @param fn - 需要延迟执行的函数
+ */
+ const scheduler = (fn) => {
+  if(!queue.includes(fn)){
+    queue.push(fn)
+  }
+  if (!queued) {                      // 避免重复调度
+    queued = true
+    tick.then(flush)                  // 下一个任务阶段执行队列
+  }
+}
+/**
+ * 执行队列中所有任务并清空队列
+ */
+ const flush = () => {
+    // 逐个执行任务
+    for (let i = 0; i < queue.length; i++) {
+        queue[i]()
+    }
+    // 清空队列
+    queue.length = 0
+    queued = false
+}
+
+
+const state = reactive({ a: '掘金签约作者', b: 'Cobyte', c: 'c', flag: true })
+const runner = effect(() => {
+  if (state.flag) {
+    // 依赖 state.a
+    console.log(state.a);
+    console.log(state.b);
+  } else {
+    // 依赖 state.b
+    console.log(state.b);
+  }
+});
+state.flag = false
+state.b = '掘金签约作者：Cobyte'
+
+</script>
+</body>
+</html>
